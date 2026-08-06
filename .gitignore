@@ -1,0 +1,53 @@
+# Build output
+build-*/
+**/build/
+**/cmake-build-*/
+debug/
+release/
+
+# CMake / qmake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+.qmake.stash
+*.pro.user
+*.pro.user.*
+moc_*.cpp
+moc_predefs.h
+ui_*.h
+qrc_*.cpp
+object_script.*
+
+# Compiled binaries and object files
+*.o
+*.obj
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.a
+
+# Local data and logs
+db/*.db
+*.log
+stderr*.txt
+
+# IDE / editor settings
+.idea/
+.vscode/
+*.user
+
+# Local UI backups and verification screenshots
+client/ui/backup-*/
+client/ui/_*.png
+client/ui/*.bak-session-artifact
+docs/tmp-ui-specs/
+
+# Local design assets and planning notes not published to this repository
+/UI/
+/docs/
+/mermaid-diagram*.svg
+/*.md
+!README.md
+/LICENSE

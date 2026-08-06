@@ -1,0 +1,18 @@
+﻿<RCC>
+    <qresource prefix="/icons">
+        <file alias="icon-user.png">resources/icons/icon-user.png</file>
+        <file alias="icon-mail.png">resources/icons/icon-mail.png</file>
+        <file alias="icon-lock.png">resources/icons/icon-lock.png</file>
+        <file alias="win-min.png">resources/icons/win-min.png</file>
+        <file alias="win-max.png">resources/icons/win-max.png</file>
+        <file alias="win-close.png">resources/icons/win-close.png</file>
+        <file alias="icon-call.png">resources/icons/icon-call.png</file>
+        <file alias="icon-hangup.png">resources/icons/icon-hangup.png</file>
+        <file alias="icon-mic.png">resources/icons/icon-mic.png</file>
+        <file alias="icon-cam.png">resources/icons/icon-cam.png</file>
+        <file alias="icon-message.png">resources/icons/icon-message.png</file>
+        <file alias="icon-mic-new.png">../UI/icons/maikefeng.png</file>
+        <file alias="icon-cam-new.png">../UI/icons/shexiangtou.png</file>
+        <file alias="icon-more.png">../UI/icons/gengduo.png</file>
+    </qresource>
+</RCC>

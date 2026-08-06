@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QWidget" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>930</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>900</width>
+    <height>600</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>xiaofu-vcal 客户端</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">#MainWindow{background:#C7C7CC;}</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>1</number>
+   </property>
+   <property name="topMargin">
+    <number>1</number>
+   </property>
+   <property name="rightMargin">
+    <number>1</number>
+   </property>
+   <property name="bottomMargin">
+    <number>1</number>
+   </property>
+   <item>
+    <widget class="QStackedWidget" name="stackMain">
+     <property name="currentIndex">
+      <number>1</number>
+     </property>
+     <widget class="MainWidget" name="mainPage"/>
+     <widget class="LoginWidget" name="loginPage"/>
+     <widget class="RegisterWidget" name="registerPage"/>
+     <widget class="ForgotPasswordWidget" name="forgotPage"/>
+     <widget class="ChatWidget" name="chatPage"/>
+     <widget class="CallWidget" name="callPage"/>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MainWidget</class>
+   <extends>QWidget</extends>
+   <header>MainWidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>LoginWidget</class>
+   <extends>QWidget</extends>
+   <header>LoginWidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>RegisterWidget</class>
+   <extends>QWidget</extends>
+   <header>RegisterWidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ForgotPasswordWidget</class>
+   <extends>QWidget</extends>
+   <header>ForgotPasswordWidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ChatWidget</class>
+   <extends>QWidget</extends>
+   <header>ChatWidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>CallWidget</class>
+   <extends>QWidget</extends>
+   <header>CallWidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
