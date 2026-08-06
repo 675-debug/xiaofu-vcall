@@ -9,6 +9,7 @@
 #include "network/NetworkManager.h"
 #include <QPainter>
 #include <QMouseEvent>
+#include <QDebug>
 
 const QSize MainWindow::kAuthWindowSize = QSize(900, 930);
 const QSize MainWindow::kWorkspaceWindowSize = QSize(1650, 1000);
@@ -41,6 +42,7 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::initNetwork() {
+    qDebug() << "[MainWindow] connect server:" << "127.0.0.1" << 9000;
     networkManager->connectToServer("127.0.0.1", 9000);
 }
 
@@ -77,6 +79,8 @@ void MainWindow::setupConnections() {
         showWorkspacePage(5);
     });
     connect(ui->mainPage, &MainWidget::logoutRequested, this, [this]() {
+        networkManager->logout();
+        ui->mainPage->resetSession();
         showAuthPage(1);
     });
 
@@ -96,7 +100,8 @@ void MainWindow::setupConnections() {
 
     // 登录成功 → 主界面
     connect(ui->loginPage, &LoginWidget::loginSucceeded, this, [this](const QString& username) {
-        Q_UNUSED(username);
+        qDebug() << "[MainWindow] login succeeded, switch workspace:" << username;
+        ui->mainPage->setCurrentUser(username);
         showWorkspacePage(0);
     });
 }

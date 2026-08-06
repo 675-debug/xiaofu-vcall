@@ -14,6 +14,7 @@ public:
     void handleHeartbeat(int fd);
     void removeConnection(int fd);
     std::string usernameOf(int fd) const;
+    int fdOf(const std::string& username) const;
     int kickTimeoutUsers(int timeoutMs);
 
 private:

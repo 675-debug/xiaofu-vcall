@@ -26,6 +26,28 @@ int main() {
     JsonValue back = JsonValue::parse(out.serialize(), &ok2);
     check(ok2 && back.get("code").asNumber() == 0, "json round trip");
 
+    JsonValue historyResponse;
+    historyResponse.set("type", JsonValue("history_resp"));
+    historyResponse.set("code", JsonValue(0));
+    JsonValue messageArray;
+    JsonValue firstMessage;
+    firstMessage.set("id", JsonValue(1));
+    firstMessage.set("from", JsonValue("alice"));
+    firstMessage.set("content", JsonValue("你好，Bob！"));
+    JsonValue secondMessage;
+    secondMessage.set("id", JsonValue(2));
+    secondMessage.set("from", JsonValue("bob"));
+    secondMessage.set("content", JsonValue("你好，Alice！"));
+    messageArray.push(firstMessage);
+    messageArray.push(secondMessage);
+    historyResponse.set("messages", messageArray);
+    bool historyOk = false;
+    JsonValue parsedHistory = JsonValue::parse(historyResponse.serialize(), &historyOk);
+    check(historyOk && parsedHistory.get("messages").isArray()
+          && parsedHistory.get("messages").size() == 2
+          && parsedHistory.get("messages").at(1).get("content").asString() == "你好，Alice！",
+          "json nested history response round trip");
+
     check(PasswordHasher::sha256Hex("123456") ==
           "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92", "sha256 123456");
     check(PasswordHasher::sha256Hex("") ==

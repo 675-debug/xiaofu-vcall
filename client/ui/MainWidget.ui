@@ -42,8 +42,8 @@ QToolButton#btnAvatar:hover{background:#0062CC;}
 #myAccountInfo:hover{background:#E8E8ED;}
 QLineEdit#editSearch{border:1px solid #D9D9DE;border-radius:10px;padding:0 12px;font-size:13px;background:#F5F5F5;color:#1A1A2E;}
 QLineEdit#editSearch:focus{border-color:#007AFF;background:#FFFFFF;}
-QToolButton#btnSettings{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;color:#48484A;font-size:13px;font-weight:500;padding:0 10px;}
-QToolButton#btnSettings:hover{background:#E8E8ED;}
+QToolButton#btnSettings,QToolButton#btnAddContact{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;color:#48484A;font-size:13px;font-weight:500;padding:0 10px;}
+QToolButton#btnSettings:hover,QToolButton#btnAddContact:hover{background:#E8E8ED;}
 #labelOnline,#labelOffline{font-size:11px;font-weight:700;color:#6E6E73;padding:8px 16px 4px 16px;}
 QListWidget#listContacts,QListWidget#listOffline{border:none;background:transparent;outline:none;padding:0 12px 8px 12px;}
 QListWidget#listContacts::item,QListWidget#listOffline::item{padding:0px;border-radius:10px;color:#1A1A2E;font-size:13px;}
@@ -72,7 +72,9 @@ QPushButton#btnSend:pressed{background:#0055B8;}
 #labelSettingAccount,#labelSettingNick,#labelSettingQuality,#labelSettingVersion{font-size:13px;color:#8E8E93;}
 #labelSettingStatus{font-size:13px;color:#34C759;}
 QPushButton#btnLogout,QPushButton#btnCloseModal{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;color:#48484A;font-size:13px;font-weight:500;}
-QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}</string>
+QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
+QPushButton#btnClearChatRecords{border:1px solid #FFB7B2;border-radius:10px;background:#FFF5F4;color:#D92D20;font-size:13px;font-weight:600;}
+QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
   </property>
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
@@ -350,7 +352,7 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
                   <item>
                    <widget class="QLabel" name="labelMyName">
                     <property name="text">
-                     <string>Alice</string>
+                     <string>未登录</string>
                     </property>
                    </widget>
                   </item>
@@ -440,6 +442,15 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
                  <property name="text">
                   <string>&#9881;</string>
                  </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QToolButton" name="btnAddContact">
+                 <property name="minimumSize"><size><width>42</width><height>38</height></size></property>
+                 <property name="maximumSize"><size><width>42</width><height>38</height></size></property>
+                 <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+                 <property name="toolTip"><string>添加联系人</string></property>
+                 <property name="text"><string>＋</string></property>
                 </widget>
                </item>
               </layout>
@@ -682,7 +693,7 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
                    <item>
                     <widget class="QLabel" name="chatName">
                      <property name="text">
-                      <string>Bob</string>
+                      <string>未选择联系人</string>
                      </property>
                     </widget>
                    </item>
@@ -874,21 +885,21 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
     <property name="geometry">
      <rect>
       <x>635</x>
-      <y>330</y>
+      <y>300</y>
       <width>380</width>
-      <height>340</height>
+      <height>400</height>
      </rect>
     </property>
     <property name="minimumSize">
      <size>
       <width>380</width>
-      <height>340</height>
+      <height>400</height>
      </size>
     </property>
     <property name="maximumSize">
      <size>
       <width>380</width>
-      <height>340</height>
+      <height>400</height>
      </size>
     </property>
     <layout class="QVBoxLayout" name="settingsPanelLayout">
@@ -971,7 +982,7 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
         <item>
          <widget class="QLabel" name="labelSettingAccount">
           <property name="text">
-           <string>alice</string>
+           <string>未登录</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignRight|Qt::AlignVCenter</set>
@@ -1022,7 +1033,7 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
      <item>
       <widget class="QLabel" name="labelSettingNick">
        <property name="text">
-        <string>Alice</string>
+        <string>未登录</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignRight|Qt::AlignVCenter</set>
@@ -1183,6 +1194,22 @@ QPushButton#btnLogout:hover,QPushButton#btnCloseModal:hover{background:#E8E8ED;}
       </widget>
      </item>
     </layout>
+   </widget>
+  </item>
+  <item>
+   <widget class="QPushButton" name="btnClearChatRecords">
+    <property name="minimumSize">
+     <size>
+      <width>0</width>
+      <height>38</height>
+     </size>
+    </property>
+    <property name="cursor">
+     <cursorShape>PointingHandCursor</cursorShape>
+    </property>
+    <property name="text">
+     <string>清空所有聊天记录</string>
+    </property>
    </widget>
   </item>
   <item>

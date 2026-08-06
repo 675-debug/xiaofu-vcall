@@ -12,7 +12,8 @@ long long nowMs() {
 JoinHandler::JoinHandler(KickCallback callback) : kickCallback(callback) {}
 
 bool JoinHandler::handleJoin(int fd, const std::string& username) {
-    if (username.empty() || sessions.count(username)) return false;
+    // 一个连接只允许绑定一个账号；切换账号必须先发送 leave。
+    if (username.empty() || sessions.count(username) || usernamesByFd.count(fd)) return false;
     Session session;
     session.fd = fd;
     session.lastHeartbeatMs = nowMs();
@@ -41,6 +42,11 @@ size_t JoinHandler::onlineCount() const { return sessions.size(); }
 std::string JoinHandler::usernameOf(int fd) const {
     const auto userIterator = usernamesByFd.find(fd);
     return userIterator == usernamesByFd.end() ? std::string() : userIterator->second;
+}
+
+int JoinHandler::fdOf(const std::string& username) const {
+    const auto sessionIterator = sessions.find(username);
+    return sessionIterator == sessions.end() ? -1 : sessionIterator->second.fd;
 }
 
 int JoinHandler::kickTimeoutUsers(int timeoutMs) {

@@ -3,6 +3,7 @@
 #include "network/NetworkManager.h"
 #include <QDebug>
 #include <QHBoxLayout>
+#include <QJsonObject>
 #include <QLabel>
 #include <QListWidgetItem>
 #include <QTime>
@@ -12,11 +13,13 @@ ChatWidget::ChatWidget(QWidget* parent)
     : QWidget(parent), ui(new Ui::ChatWidget) {
     ui->setupUi(this);
 
+    // 独立聊天页不保留演示联系人或示例消息，数据由服务端历史记录填充。
     ui->listMessages->clear();
-    addMessageItem("B", "#10B981", "早，Alice！昨晚的会议纪要整理好了吗？", "09:18", false);
-    addMessageItem("A", "#007AFF", "早！刚整理完，这就发你。", "09:20", true);
-    addMessageItem("B", "#10B981", "好，收到后我们再开视频确认一下。", "09:21", false);
-    ui->convList->setCurrentRow(0);
+    ui->convList->clear();
+    ui->headName->setText(QStringLiteral("未选择联系人"));
+    ui->headAvatar->setText(QStringLiteral("?"));
+    ui->headStatus->setText(QStringLiteral("请从主界面选择联系人"));
+    ui->btnCall->setEnabled(false);
 }
 
 ChatWidget::~ChatWidget() {
@@ -25,6 +28,14 @@ ChatWidget::~ChatWidget() {
 
 void ChatWidget::setNetworkManager(NetworkManager* manager) {
     networkManager = manager;
+    if (!networkManager)
+        return;
+    connect(networkManager, &NetworkManager::chatReceived,
+            this, &ChatWidget::onChatReceived);
+    connect(networkManager, &NetworkManager::historyReceived,
+            this, &ChatWidget::onHistoryReceived);
+    connect(networkManager, &NetworkManager::allChatsCleared,
+            this, &ChatWidget::onAllChatsCleared);
 }
 
 void ChatWidget::on_btnSend_clicked() {
@@ -75,16 +86,18 @@ void ChatWidget::on_convList_itemClicked(QListWidgetItem* item) {
         : "font-size:11px;color:#8E8E93;font-weight:500;");
     ui->btnCall->setEnabled(status == QStringLiteral("在线"));
 
-    // TODO: 后续根据当前联系人从服务器拉取历史消息并刷新消息列表。
-    qDebug() << "[ChatWidget] conversation selected:" << name << status;
+    currentContact = name;
+    clearMessageList();
+    if (networkManager)
+        networkManager->requestHistory(currentContact);
 }
 
 void ChatWidget::appendLocalMessage() {
     const QString text = ui->editMessage->text().trimmed();
-    if (text.isEmpty())
+    if (text.isEmpty() || !networkManager || currentContact.isEmpty())
         return;
 
-    // TODO: 后续将文本消息封装为协议 JSON 并通过 NetworkManager 发送。
+    networkManager->sendChat(currentContact, text);
     addMessageItem("A", "#007AFF", text,
                    QTime::currentTime().toString("HH:mm"), true);
     ui->editMessage->clear();
@@ -148,4 +161,42 @@ void ChatWidget::addMessageItem(const QString& avatarText, const QString& color,
         + timeLabel->sizeHint().height();
     item->setSizeHint(QSize(0, qMax(avatar->height(), contentHeight) + 16));
     ui->listMessages->setItemWidget(item, row);
+}
+
+void ChatWidget::clearMessageList() {
+    ui->listMessages->clear();
+}
+
+void ChatWidget::appendHistoryMessage(const QString& sender, const QString& content, const QString& sentAt) {
+    const bool mine = networkManager && sender == networkManager->currentUsername();
+    const QString avatarText = mine ? QStringLiteral("A") : sender.left(1).toUpper();
+    const QString avatarColor = mine ? QStringLiteral("#007AFF") : QStringLiteral("#10B981");
+    const QString displayTime = sentAt.size() >= 5 ? sentAt.right(5) : sentAt;
+    addMessageItem(avatarText, avatarColor, content, displayTime, mine);
+}
+
+void ChatWidget::onChatReceived(const QString& sender, const QString& content, const QString& sentAt) {
+    if (sender != currentContact)
+        return;
+    appendHistoryMessage(sender, content, sentAt);
+    ui->listMessages->scrollToBottom();
+}
+
+void ChatWidget::onHistoryReceived(const QString& peer, const QJsonArray& messages) {
+    if (peer != currentContact)
+        return;
+    clearMessageList();
+    for (const QJsonValue& value : messages) {
+        const QJsonObject message = value.toObject();
+        appendHistoryMessage(message.value("from").toString(),
+                             message.value("content").toString(),
+                             message.value("sentAt").toString());
+    }
+    ui->listMessages->scrollToBottom();
+}
+
+void ChatWidget::onAllChatsCleared(int code, const QString& message) {
+    Q_UNUSED(message);
+    if (code == 0)
+        clearMessageList();
 }

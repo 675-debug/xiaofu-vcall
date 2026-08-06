@@ -266,7 +266,7 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
           <set>Qt::AlignCenter</set>
          </property>
          <property name="text">
-          <string>B</string>
+          <string>?</string>
          </property>
         </widget>
        </item>
@@ -276,7 +276,7 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
           <set>Qt::AlignCenter</set>
          </property>
          <property name="text">
-          <string>Bob</string>
+          <string>未选择联系人</string>
          </property>
         </widget>
        </item>
@@ -438,7 +438,7 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
             <set>Qt::AlignCenter</set>
            </property>
            <property name="text">
-            <string>B</string>
+            <string>?</string>
            </property>
           </widget>
          </item>
@@ -448,7 +448,7 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
             <set>Qt::AlignCenter</set>
            </property>
            <property name="text">
-            <string>Bob</string>
+            <string>未选择联系人</string>
            </property>
           </widget>
          </item>

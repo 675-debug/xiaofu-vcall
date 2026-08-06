@@ -7,10 +7,17 @@
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QStyle>
+#include <QRandomGenerator>
 
 RegisterWidget::RegisterWidget(QWidget* parent)
     : QWidget(parent), ui(new Ui::RegisterWidget) {
     ui->setupUi(this);
+    avatarSeed = QRandomGenerator::global()->bounded(6);
+    static const QStringList colors = {"#10B981", "#F97316", "#8B5CF6", "#007AFF", "#EC4899", "#14B8A6"};
+    ui->avatarPreview->setStyleSheet(QString("background:%1;color:#FFFFFF;border-radius:18px;font-weight:700;").arg(colors.at(avatarSeed)));
+    connect(ui->editNickname, &QLineEdit::textChanged, this, [this](const QString& text) {
+        ui->avatarPreview->setText(text.trimmed().isEmpty() ? QStringLiteral("匿") : text.left(1).toUpper());
+    });
 
     // Enter 键：账号→邮箱→密码→确认密码，最后回车提交注册
     connect(ui->editUser, &QLineEdit::returnPressed, this, [this]() { ui->editMail->setFocus(); });
@@ -76,12 +83,18 @@ void RegisterWidget::on_btnRegister_clicked() {
         return;
     }
     const QString username = ui->editUser->text().trimmed();
+    const QString nickname = ui->editNickname->text().trimmed();
     const QString email = ui->editMail->text().trimmed();
     const QString password = ui->editPass->text();
     const QString repeatedPassword = ui->editPass2->text();
     if (username.isEmpty()) {
         setFieldError(ui->editUser, true);
         QMessageBox::warning(this, "提示", "请输入账号");
+        return;
+    }
+    if (nickname.isEmpty()) {
+        setFieldError(ui->editNickname, true);
+        QMessageBox::warning(this, "提示", "请输入昵称");
         return;
     }
     if (!isValidEmail(email)) {
@@ -99,7 +112,7 @@ void RegisterWidget::on_btnRegister_clicked() {
         QMessageBox::warning(this, "提示", "两次密码不一致");
         return;
     }
-    networkManager->sendRegister(username, email, password);
+    networkManager->sendRegister(username, email, password, nickname, avatarSeed);
 }
 
 void RegisterWidget::onRegisterResult(int code, const QString& message) {

@@ -37,4 +37,5 @@ private:
 
     Ui::RegisterWidget* ui;
     NetworkManager*     networkManager = nullptr;
+    int avatarSeed = 0;
 };

@@ -7,9 +7,9 @@ $failures = New-Object System.Collections.Generic.List[string]
 
 $checks = @(
     @{ Ui = 'LoginWidget.ui'; Width = 900; Height = 930; Names = @('editUser', 'editPass', 'btnLogin') },
-    @{ Ui = 'RegisterWidget.ui'; Width = 900; Height = 930; Names = @('editUser', 'editMail', 'editPass', 'editPass2', 'btnRegister') },
+    @{ Ui = 'RegisterWidget.ui'; Width = 900; Height = 930; Names = @('editUser', 'editNickname', 'avatarPreview', 'editMail', 'editPass', 'editPass2', 'btnRegister') },
     @{ Ui = 'ForgotPasswordWidget.ui'; Width = 900; Height = 930; Names = @('editUser', 'editNewPass', 'btnSend') },
-    @{ Ui = 'MainWidget.ui'; Width = 1650; Height = 1000; Names = @('listContacts', 'listOffline', 'chatStack', 'settingsMask') },
+    @{ Ui = 'MainWidget.ui'; Width = 1650; Height = 1000; Names = @('listContacts', 'listOffline', 'chatStack', 'settingsMask', 'btnClearChatRecords') },
     @{ Ui = 'ChatWidget.ui'; Width = 1650; Height = 1000; Names = @('convList', 'listMessages', 'editMessage', 'btnSend') },
     @{ Ui = 'CallWidget.ui'; Width = 1650; Height = 1000; Names = @('callStack', 'btnMic', 'btnCam', 'btnHangup', 'moreMenu') }
 )
@@ -106,9 +106,19 @@ foreach ($signature in @('appendLocalMessage')) {
         $failures.Add("MainWidget.h: missing '$signature'")
     }
 }
+foreach ($signature in @('setCurrentUser', 'currentContact', 'showContactMenu', 'clearMessageList', 'renderContacts', 'onPresenceChanged', 'addStatusMessage')) {
+    if ($mainWidgetHeader -notmatch [regex]::Escape($signature)) {
+        $failures.Add("MainWidget.h: missing chat behavior '$signature'")
+    }
+}
 foreach ($behavior in @('setHidden', 'QTime::currentTime', 'scrollToBottom', 'settingsMask->setGeometry(rect())', 'settingsMask->raise()', 'setPixelSize(13)', 'bubble->setContentsMargins(14, 10, 14, 10)', 'horizontalAdvance', 'const int contentHeight')) {
     if ($mainWidgetSource -notmatch [regex]::Escape($behavior)) {
         $failures.Add("MainWidget.cpp: missing behavior '$behavior'")
+    }
+}
+foreach ($behavior in @('Qt::CustomContextMenu', 'QMenu', 'deleteConversation', 'clearAllChats', 'requestHistory', 'sendChat')) {
+    if ($mainWidgetSource -notmatch [regex]::Escape($behavior)) {
+        $failures.Add("MainWidget.cpp: missing chat routing behavior '$behavior'")
     }
 }
 $mainWidgetUi = Get-Content -Raw -LiteralPath (Join-Path $uiRoot 'MainWidget.ui')
@@ -135,6 +145,11 @@ foreach ($signature in @('appendLocalMessage', 'addMessageItem')) {
         $failures.Add("ChatWidget.h: missing '$signature'")
     }
 }
+foreach ($behavior in @('sendChat', 'requestHistory', 'chatReceived')) {
+    if ($chatSource -notmatch [regex]::Escape($behavior)) {
+        $failures.Add("ChatWidget.cpp: missing network chat behavior '$behavior'")
+    }
+}
 foreach ($behavior in @('QTime::currentTime', 'scrollToBottom', 'headName->setText', 'bubble->setContentsMargins(14, 10, 14, 10)', 'setPixelSize(13)', 'horizontalAdvance', 'item->setSizeHint')) {
     if ($chatSource -notmatch [regex]::Escape($behavior)) {
         $failures.Add("ChatWidget.cpp: missing behavior '$behavior'")
@@ -146,6 +161,24 @@ if ($chatUi -notmatch [regex]::Escape('Microsoft YaHei UI')) {
 }
 if ($chatUi -notmatch [regex]::Escape('QListWidget#listMessages::item{padding:0px;')) {
     $failures.Add('ChatWidget.ui: listMessages still has duplicate item padding')
+}
+
+$dynamicDataFiles = @(
+    (Join-Path $sourceRoot 'MainWidget.cpp'),
+    (Join-Path $sourceRoot 'ChatWidget.cpp'),
+    (Join-Path $sourceRoot 'ChatWidget.h'),
+    (Join-Path $uiRoot 'MainWidget.ui'),
+    (Join-Path $uiRoot 'ChatWidget.ui'),
+    (Join-Path $uiRoot 'CallWidget.ui')
+)
+foreach ($file in $dynamicDataFiles) {
+    $content = Get-Content -Raw -LiteralPath $file
+    foreach ($sampleName in @('Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank')) {
+        $samplePattern = '(?<![A-Za-z])' + [regex]::Escape($sampleName) + '(?![A-Za-z])'
+        if ($content -match $samplePattern) {
+            $failures.Add("$(Split-Path -Leaf $file): static demo user '$sampleName' remains")
+        }
+    }
 }
 
 $callHeader = Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'CallWidget.h')
@@ -193,6 +226,19 @@ if ($callUi -notmatch [regex]::Escape('Microsoft YaHei UI')) {
 }
 if ($callUi -notmatch [regex]::Escape('QWidget#CallWidget,QWidget#callPage')) {
     $failures.Add('CallWidget.ui: promoted callPage is missing dark background selector')
+}
+
+$networkHeader = Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'network/NetworkManager.h')
+$networkSource = Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'network/NetworkManager.cpp')
+foreach ($signature in @('sendJoin', 'sendHeartbeat', 'heartbeatTimer', 'sendChat', 'requestHistory', 'deleteConversation', 'clearAllChats', 'requestContacts', 'addContact', 'contactsReceived', 'presenceChanged', 'chatSendResult', 'chatReceived', 'historyReceived', 'currentUsername')) {
+    if (($networkHeader + $networkSource) -notmatch [regex]::Escape($signature)) {
+        $failures.Add("NetworkManager: missing chat protocol '$signature'")
+    }
+}
+foreach ($logToken in @('[Network] login success', '[Network] heartbeat sent', '[Network] contacts received', '[Main] current user', '[Main] contacts rendered')) {
+    if (($mainWidgetSource + $networkSource) -notmatch [regex]::Escape($logToken)) {
+        $failures.Add("client log is missing '$logToken'")
+    }
 }
 foreach ($avatarSelector in @('#avatarRinging{background:#10B981', '#avatarIncall{background:#10B981')) {
     if ($callUi -notmatch [regex]::Escape($avatarSelector)) {

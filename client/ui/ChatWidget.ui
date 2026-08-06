@@ -253,21 +253,6 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
            <property name="focusPolicy">
             <enum>Qt::NoFocus</enum>
            </property>
-           <item>
-            <property name="text">
-             <string>Bob - 在线</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Charlie - 在线</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Diana - 在线</string>
-            </property>
-           </item>
           </widget>
          </item>
         </layout>
@@ -342,7 +327,7 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
               <item>
                <widget class="QLabel" name="headName">
                 <property name="text">
-                 <string>Bob</string>
+                 <string>未选择联系人</string>
                 </property>
                </widget>
               </item>
@@ -406,32 +391,6 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
            <property name="focusPolicy">
             <enum>Qt::NoFocus</enum>
            </property>
-           <item>
-            <property name="text">
-             <string>早，alice！昨晚的会议纪要整理好了吗？</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>早！刚整理完，这就发你。</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>PDF 版本在共享盘，word 版我一会儿补上。</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>收到，辛苦了。</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>对了，今晚八点一起打视频？我这边把摄像头调好了。</string>
-            </property>
-           </item>
-
           </widget>
          </item>
          <item>

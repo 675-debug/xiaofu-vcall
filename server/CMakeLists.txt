@@ -18,6 +18,7 @@ set(SERVER_SOURCES
     src/handler/LoginHandler.cpp
     src/handler/RegisterHandler.cpp
     src/handler/ForgotHandler.cpp
+    src/handler/ChatHandler.cpp
     src/heartbeat/HeartbeatManager.cpp
     src/db/DbManager.cpp
     src/db/PasswordHasher.cpp
@@ -32,6 +33,15 @@ target_link_libraries(xiaofu-server PRIVATE ${SQLITE_LIB} ws2_32 advapi32)
 add_executable(unit_test tools/unit_test.cpp src/protocol/JsonValue.cpp src/db/PasswordHasher.cpp)
 target_include_directories(unit_test PRIVATE src)
 target_link_libraries(unit_test PRIVATE advapi32)
+
+add_executable(chat_handler_test
+    tools/chat_handler_test.cpp
+    src/db/DbManager.cpp
+    src/handler/ChatHandler.cpp
+    src/handler/JoinHandler.cpp
+    src/util/Log.cpp)
+target_include_directories(chat_handler_test PRIVATE src ${SQLITE_INCLUDE_DIR})
+target_link_libraries(chat_handler_test PRIVATE ${SQLITE_LIB})
 
 add_executable(test_client tools/test_client.cpp)
 target_link_libraries(test_client PRIVATE ws2_32)

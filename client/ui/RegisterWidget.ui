@@ -382,6 +382,28 @@ QPushButton#btnBackLogin:hover{color:#0062CC;}</string>
           </spacer>
          </item>
          <item>
+          <widget class="QWidget" name="fieldNickname" native="true">
+           <property name="minimumSize"><size><width>0</width><height>46</height></size></property>
+           <property name="maximumSize"><size><width>16777215</width><height>46</height></size></property>
+           <widget class="QLabel" name="avatarPreview">
+            <property name="geometry"><rect><x>0</x><y>5</y><width>36</width><height>36</height></rect></property>
+            <property name="text"><string>匿</string></property>
+            <property name="alignment"><set>Qt::AlignCenter</set></property>
+           </widget>
+           <widget class="QLineEdit" name="editNickname">
+            <property name="geometry"><rect><x>48</x><y>0</y><width>352</width><height>46</height></rect></property>
+            <property name="placeholderText"><string>昵称（将显示给联系人）</string></property>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <spacer name="gapNicknameUser">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+           <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>0</width><height>14</height></size></property>
+          </spacer>
+         </item>
+         <item>
           <widget class="QWidget" name="fieldUser" native="true">
            <property name="minimumSize">
             <size>
