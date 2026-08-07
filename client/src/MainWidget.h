@@ -24,7 +24,7 @@ public:
 
 signals:
     void switchToChat();
-    void switchToCall();
+    void switchToCall(const QString& peerName);
     void logoutRequested();
 
 private slots:

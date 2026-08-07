@@ -4,6 +4,10 @@
 class NetworkManager;
 class QEvent;
 class QResizeEvent;
+class QWebChannel;
+class QWebEngineView;
+class WebRtcBridge;
+class VideoCallController;
 
 namespace Ui {
 class CallWidget;
@@ -16,10 +20,11 @@ public:
     ~CallWidget();
 
     void setNetworkManager(NetworkManager* manager);
-    void startDemoCall();
+    void startOutgoingCall(const QString& peerName);
 
 signals:
     void backToMainWidget();
+    void incomingCallRequested();
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -44,9 +49,18 @@ private:
     void refreshButtonStyle(QWidget* widget);
     void clampPipPosition();
     void resetPipPosition();
+    void setupWebRtcView();
+    void updateWebRtcGeometry();
+    void showIncomingCallDialog(const QString& peerName);
+    void updateCallPageForState();
 
     Ui::CallWidget* ui;
     NetworkManager* networkManager = nullptr;
+    QWebEngineView* webRtcView = nullptr;
+    QWebChannel* webChannel = nullptr;
+    WebRtcBridge* webRtcBridge = nullptr;
+    VideoCallController* callController = nullptr;
+    bool webRtcPageReady = false;
     bool microphoneEnabled = true;
     bool cameraEnabled = true;
     bool pipExpanded = false;
@@ -58,5 +72,4 @@ private:
     QPoint pipStartPosition;
     bool pipDragging = false;
     bool ignoreNextPipClick = false;
-    int demoCallSerial = 0;
 };

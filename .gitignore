@@ -47,6 +47,8 @@ docs/tmp-ui-specs/
 # Local design assets and planning notes not published to this repository
 /UI/
 /docs/
+!/docs/
+!/docs/video-call-technical-plan.md
 /mermaid-diagram*.svg
 /*.md
 !README.md

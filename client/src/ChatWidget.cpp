@@ -48,8 +48,8 @@ void ChatWidget::on_btnBack_clicked() {
 }
 
 void ChatWidget::on_btnCall_clicked() {
-    // TODO: 发起视频通话
-    emit startCall();
+    if (!currentContact.isEmpty())
+        emit startCall(currentContact);
 }
 
 void ChatWidget::on_btnMin_clicked() {

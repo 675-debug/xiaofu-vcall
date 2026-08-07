@@ -19,7 +19,7 @@ public:
 
 signals:
     void backToMain();
-    void startCall();
+    void startCall(const QString& peerName);
 
 private slots:
     void on_btnSend_clicked();

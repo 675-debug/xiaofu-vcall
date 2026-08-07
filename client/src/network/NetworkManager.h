@@ -1,6 +1,7 @@
 #pragma once
 #include <QObject>
 #include <QJsonArray>
+#include <QVariantMap>
 #include <QString>
 #include <QTcpSocket>
 
@@ -28,6 +29,8 @@ public:
     void addContact(const QString& username);
     void requestFriendRequests();
     void respondToFriendRequest(const QString& sender, bool accepted);
+    // 复用现有 TCP 信令通道转发 WebRTC 协商消息，视频媒体不经过本服务端。
+    void sendCallSignal(const QVariantMap& signal);
     QString currentUsername() const;
     bool isConnected() const;
 
@@ -46,6 +49,8 @@ signals:
     void presenceChanged(const QString& username, bool online);
     void chatSendResult(const QString& peer, bool online, int code, const QString& message);
     void friendRequestReceived(const QString& sender, const QString& nickname, int avatarSeed);
+    void callSignalReceived(const QVariantMap& signal);
+    void callSignalSendResult(const QString& signalType, int code, const QString& message);
     void connectionError(const QString& errorMessage);
 
 private slots:

@@ -1,4 +1,4 @@
-QT += core gui widgets network
+QT += core gui widgets network webenginewidgets webchannel
 TARGET = xiaofu-vcall-client
 TEMPLATE = app
 CONFIG += c++11
@@ -15,6 +15,8 @@ SOURCES += \
     src/ForgotPasswordWidget.cpp \
     src/ChatWidget.cpp \
     src/CallWidget.cpp \
+    src/video/WebRtcBridge.cpp \
+    src/video/VideoCallController.cpp \
     src/network/NetworkManager.cpp
 
 HEADERS += \
@@ -25,6 +27,8 @@ HEADERS += \
     src/ForgotPasswordWidget.h \
     src/ChatWidget.h \
     src/CallWidget.h \
+    src/video/WebRtcBridge.h \
+    src/video/VideoCallController.h \
     src/network/NetworkManager.h
 
 FORMS += \

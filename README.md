@@ -1,108 +1,226 @@
 # xiaofu-vcall
 
-一个基于 Qt Widgets 和 C++ 的视频通话客户端/服务端项目。当前版本已完成桌面端 UI、账户认证、TCP 长连接协议、服务端连接管理和真实文字聊天；通话信令与 FFmpeg 媒体链路将在后续迭代实现。
+`xiaofu-vcall` 是一个基于 C++ / Qt 的即时通信与视频通话练习项目，目标是把 Linux 网络编程、多任务编程、SQLite 数据持久化、Qt 桌面 UI、WebRTC/FFmpeg 视频通话这些知识点串成一个能稳定演示的秋招项目。
+
+当前重点已经从静态 UI 进入真实通信链路：服务端支持 TCP 长连接、epoll 事件循环、线程池任务处理、SQLite 历史消息保存；客户端支持账号登录、联系人、中文聊天、好友申请、聊天记录和视频通话页面。
 
 ## 当前能力
 
-- Qt Widgets 客户端：登录、注册、找回密码、联系人、聊天和视频通话页面。
-- 1650 × 1000 工作区界面，通话页支持麦克风、摄像头、更多菜单、全屏等本地交互。
-- “我的视频”悬浮窗可拖拽、缩放，并自动限制在通话画面边界内。
-- 基于 `QTcpSocket` 的客户端网络层，统一处理 TCP 连接、长度头拆包和 JSON 响应分发。
-- Windows `select` 事件循环服务端，支持多连接接入、断线清理、注册、登录、找回密码、在线会话和超时检查。
-- 在线实时文字聊天：客户端登录成功后自动加入在线会话，服务端按接收方路由消息。
-- SQLite 用户与聊天记录持久化：支持离线消息保存、重连拉取双向历史、删除单个会话和清空当前账号全部聊天记录。
-- SQLite 联系人资料与在线状态：联系人单向保存；注册时填写昵称并生成稳定的随机字母头像，服务端通过 `presence_push` 实时同步上线/离线状态。
-- 联系人右键菜单：可删除与该联系人的聊天记录；在线联系人可直接进入视频聊天页面。
-- SQLite 用户数据持久化与 SHA-256 密码哈希。
+- Qt Widgets 客户端：登录、注册、找回密码、联系人列表、聊天页面、视频通话页面。
+- 云服务器通信：客户端默认连接 `8.137.152.134:9000`，也可以通过环境变量切换测试地址。
+- TCP 应用层协议：`4 字节大端长度头 + JSON payload`，解决 TCP 粘包/半包问题。
+- 真实文字聊天：两个客户端可以通过服务端在线实时转发中文消息。
+- SQLite 历史消息：服务端保存聊天记录，客户端切换联系人时可拉取历史。
+- 联系人与好友申请：支持添加联系人、好友申请弹窗、同意后互为联系人。
+- 在线状态同步：客户端 join 后通过 heartbeat 保活，服务端推送联系人在线/离线状态。
+- Linux 服务端：基于 epoll 边缘触发、非阻塞 socket、线程池、eventfd 回传结果。
+- 服务端后台运行：提供 `--daemon` 参数，也提供 systemd 部署文件。
+- 视频通话原型：已接入 Qt WebEngine + WebChannel + WebRTC 页面，服务端只负责信令转发，不做视频编解码。
 
 ## 项目结构
 
 ```text
 xiaofu-vcall/
-├── client/                 # Qt Widgets 客户端
-│   ├── src/                # 页面组件与 NetworkManager
-│   ├── ui/                 # Qt Designer 界面文件
-│   ├── resources/          # 图标等静态资源
+├── client/                         # Qt Widgets 客户端
+│   ├── src/                        # 页面组件、NetworkManager、视频控制器
+│   ├── src/video/                  # WebRTC 与 Qt WebChannel 桥接
+│   ├── ui/                         # Qt Designer UI 文件
+│   ├── resources/                  # 图标与视频通话 HTML
 │   └── xiaofu-vcall-client.pro
-├── server/                 # C++ TCP 服务端
-│   ├── src/net/            # TcpServer、Connection、事件循环
-│   ├── src/handler/        # 注册、登录、找回密码、在线会话、聊天路由
-│   ├── src/db/             # SQLite 与密码哈希
-│   ├── src/protocol/       # JSON 与结果码
+├── server/                         # C++ 服务端
+│   ├── src/net/                    # SocketPlatform、Connection、TcpServer、EpollLoop
+│   ├── src/concurrency/            # ThreadPool、CompletionDispatcher
+│   ├── src/handler/                # 注册、登录、聊天、联系人、信令处理
+│   ├── src/db/                     # SQLite、用户、好友、聊天记录、密码哈希
+│   ├── src/process/                # daemon 支持
+│   ├── deploy/                     # Ubuntu/systemd 部署文件
 │   └── CMakeLists.txt
-└── tools/                  # 可读性审计脚本
+├── tools/                          # 集成测试与辅助脚本
+├── docs/video-call-technical-plan.md
+└── README.md
 ```
 
-## 架构与协议
+## 通信架构
 
-客户端页面不会直接读写 socket，而是统一通过 `NetworkManager` 发送请求。协议格式为：
+客户端页面不直接操作 socket，而是统一通过 `NetworkManager` 发送请求。服务端接收 TCP 数据后先按长度头拆包，再根据 JSON 的 `type` 分发到对应业务处理器。
 
 ```text
-4 字节大端 payloadLength + JSON payload
+Qt UI
+  |
+  v
+NetworkManager
+  |
+  v
+4字节长度头 + JSON
+  |
+  v
+TCP 长连接
+  |
+  v
+Linux epoll 服务端
+  |
+  +--> 注册/登录/好友/聊天/历史消息
+  |
+  +--> WebRTC 通话信令转发
+  |
+  v
+SQLite
 ```
 
-服务端由 `EventLoopWin` 监听 socket 可读事件；`Connection` 负责缓存、拆帧和回写；`main.cpp` 根据 JSON 的 `type` 分发给业务 Handler；Handler 再通过 `DbManager` 访问 SQLite。
+主要协议类型包括：
 
-目前已接通的请求类型：`register`、`login`、`forgot`、`join`、`heartbeat`、`add_contact`、`contacts`、`presence_push`、`chat`、`history`、`delete_chat`、`clear_chats`。
-
-## 开发环境
-
-- Windows 10/11
-- Qt 5.12+，MinGW 7.3+（客户端）
-- CMake 3.16+（服务端）
-- SQLite 3
-
-服务端当前默认使用 Windows socket 和 `select`，并监听 `127.0.0.1:9000`。
-
-## 构建与运行
-
-### 1. 构建服务端
-
-```powershell
-cd server
-cmake -S . -B build
-cmake --build build --target xiaofu-server unit_test chat_handler_test -j 2
-.\build\unit_test.exe
-.\build\chat_handler_test.exe
-.\build\xiaofu-server.exe
+```text
+register, login, forgot, join, heartbeat,
+add_contact, friend_request, friend_accept, contacts, presence_push,
+chat, chat_push, history, delete_chat, clear_chats,
+call_request, call_accept, call_reject, call_hangup,
+webrtc_offer, webrtc_answer, webrtc_ice
 ```
 
-> 如果本机 SQLite 不在 Qt MinGW 目录，请在 CMake 配置时传入 `SQLITE_INCLUDE_DIR` 与 `SQLITE_LIB`。
+## 服务端技术点
 
-### 2. 构建客户端
+- `epoll_create1` 创建 epoll 实例。
+- `epoll_ctl` 注册监听 socket、客户端 socket、eventfd。
+- `epoll_wait` 等待网络事件和工作线程完成事件。
+- 使用边缘触发 `EPOLLET`，socket 设置为非阻塞。
+- accept/recv/send 循环读写到 `EAGAIN`，避免边缘触发漏事件。
+- 线程池使用 C++ 标准库 `std::thread`、`std::mutex`、`std::condition_variable`。
+- I/O 线程只负责 socket 和在线用户表，数据库操作丢给工作线程。
+- SQLite 使用 WAL、busy timeout，降低多线程读写锁冲突。
+- 服务端只做消息路由和信令转发，不参与视频编码、解码和转码。
+
+## 客户端技术点
+
+- Qt Widgets 实现主界面、聊天页、联系人列表和视频通话窗口。
+- `QTcpSocket` 维护长连接，统一处理连接、断线、拆包、发包。
+- `QJsonObject` 组装业务请求，协议体保持清晰可读。
+- `QWebEngineView` 承载 WebRTC 页面。
+- `QWebChannel` 在 C++ 和 JavaScript 之间传递通话信令。
+- 视频通话按钮只负责 UI 状态，真实媒体流由 WebRTC 负责采集和传输。
+
+## 构建服务端
+
+Ubuntu 22.04 推荐环境：
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake pkg-config sqlite3 libsqlite3-dev libssl-dev
+
+cd ~/workspace/server
+mkdir -p build-linux-epoll
+cd build-linux-epoll
+
+cmake ..
+cmake --build . -j"$(nproc)"
+```
+
+启动服务端：
+
+```bash
+mkdir -p /root/xiaofu-vcall-data
+
+./xiaofu-server \
+  --host 0.0.0.0 \
+  --port 9000 \
+  --workers 2 \
+  --data-dir /root/xiaofu-vcall-data
+```
+
+检查端口：
+
+```bash
+ss -lntp | grep 9000
+```
+
+## 构建客户端
+
+Windows 推荐使用 Qt 5.12.12 MSVC2017 64-bit：
 
 ```powershell
-cd client
+cd D:\MyFile\code\work\workspace\xiaofu-vcall\client
 qmake xiaofu-vcall-client.pro
-mingw32-make -j2
+nmake
 .\debug\xiaofu-vcall-client.exe
 ```
 
-客户端启动后会连接本机 `127.0.0.1:9000`，请先启动服务端。
+Linux 虚拟机需要安装 Qt WebEngine：
 
-## 测试
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  qtbase5-dev \
+  qtbase5-dev-tools \
+  qtwebengine5-dev \
+  qtwebengine5-dev-tools \
+  qtdeclarative5-dev \
+  libqt5webchannel5-dev \
+  libgl1-mesa-dev \
+  libnss3 \
+  libxkbcommon-x11-0
 
-```powershell
-# 服务端 JSON 与密码哈希单元测试
-cd server
-.\build\unit_test.exe
-
-# 客户端 UI 静态审计
-cd ..\client
-powershell -ExecutionPolicy Bypass -File tools\ui_static_audit.ps1
-
-# 客户端与服务端可读性审计
-cd ..
-powershell -ExecutionPolicy Bypass -File tools\code_readability_audit.ps1
-
-# 启动临时服务端并验证双客户端聊天完整链路
-powershell -ExecutionPolicy Bypass -File tools\chat_integration_test.ps1
+cd ~/xiaofu_vcall/client
+qmake xiaofu-vcall-client.pro
+make -j"$(nproc)"
 ```
 
-## 路线图
+客户端默认连接云服务器：
 
-- [x] 真实文字聊天消息路由、SQLite 历史消息与离线拉取。
-- [ ] 通话邀请、接听、拒绝、挂断等信令状态机。
-- [ ] 客户端 join、心跳与断线状态同步。
-- [ ] FFmpeg 摄像头/麦克风采集、本地预览与设备控制。
-- [ ] 局域网媒体传输、对端解码渲染与项目演示材料。
+```text
+8.137.152.134:9000
+```
+
+如果需要临时切换服务器地址：
+
+```powershell
+$env:XIAOFU_SERVER_HOST="10.7.154.88"
+$env:XIAOFU_SERVER_PORT="9000"
+.\debug\xiaofu-vcall-client.exe
+```
+
+```bash
+XIAOFU_SERVER_HOST=127.0.0.1 XIAOFU_SERVER_PORT=9000 ./debug/xiaofu-vcall-client
+```
+
+## 视频通话路线
+
+当前视频通话采用轻量方案：
+
+```text
+Qt 通话窗口
+  |
+  v
+QWebEngineView
+  |
+  v
+WebRTC getUserMedia / RTCPeerConnection
+  |
+  +--> 摄像头采集、编码、传输、解码、渲染由客户端完成
+  |
+  +--> offer/answer/ice 信令通过 TCP 服务端转发
+```
+
+FFmpeg 暂时不放进服务端，也不做复杂媒体服务器。后续 FFmpeg 主要用于客户端侧的学习和扩展，例如摄像头设备枚举、本地录制、截图、格式分析，或者作为 WebRTC 方案之外的实验分支。
+
+详细设计见：
+
+[docs/video-call-technical-plan.md](docs/video-call-technical-plan.md)
+
+## 测试建议
+
+- 启动云服务器 `xiaofu-server`。
+- Windows 客户端登录账号 A。
+- Linux/虚拟机客户端登录账号 B。
+- A/B 互加好友，测试联系人在线状态。
+- A 给 B 发送中文消息，检查实时接收。
+- 断开 B 后，A 发送消息，重新登录 B 后拉取历史。
+- 从联系人右键或通话按钮发起视频通话，检查 call 信令日志。
+
+## 后续计划
+
+- 完善 WebRTC 通话弹窗：呼叫、接听、拒绝、挂断。
+- 稳定处理摄像头不存在、权限拒绝、虚拟机无摄像头等情况。
+- 优化 WebRTC 视频窗口尺寸，避免花屏和比例异常。
+- 增加 TURN/coturn 配置，解决复杂 NAT 下无法直连的问题。
+- 用 FFmpeg 做客户端本地录制和设备调试辅助。
+- 写一份完整项目答辩稿，覆盖 Linux 网络编程、多任务、协议设计、数据库和视频通话。

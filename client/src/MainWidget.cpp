@@ -310,8 +310,8 @@ void MainWidget::on_btnSend_clicked() {
 }
 
 void MainWidget::on_btnCall_clicked() {
-    // TODO: 发起视频通话（离线联系人提示不可呼叫）
-    emit switchToCall();
+    if (currentContactOnline && !currentContact.isEmpty())
+        emit switchToCall(currentContact);
 }
 
 void MainWidget::on_editMessage_returnPressed() {
@@ -563,7 +563,7 @@ void MainWidget::showContactMenu(QListWidget* list, const QPoint& position, bool
     } else if (selectedAction == callAction) {
         currentContact = contact;
         currentContactOnline = true;
-        emit switchToCall();
+        emit switchToCall(contact);
     }
 }
 

@@ -1,11 +1,14 @@
 #include "Connection.h"
 #include "../util/Log.h"
 #include <cstdint>
-#include <windows.h>
 
-Connection::Connection(SOCKET socketHandle)
-    : socketHandle(socketHandle), closedFlag(false) {}
-Connection::~Connection() { if (!closedFlag) closesocket(socketHandle); }
+Connection::Connection(SocketHandle socketHandle, std::uint64_t connectionId)
+    : socketHandle(socketHandle), connectionId(connectionId), closedFlag(false) {}
+
+Connection::~Connection() {
+    if (!closedFlag)
+        closeSocket(socketHandle);
+}
 
 void Connection::onReadable() {
     if (!readMore() || closedFlag) return;
@@ -21,9 +24,9 @@ bool Connection::readMore() {
             continue;
         }
         if (receivedBytes == 0) { close(); return false; }
-        const int socketError = WSAGetLastError();
-        if (socketError == WSAEWOULDBLOCK) return true;
-        if (socketError == WSAECONNRESET || socketError == WSAECONNABORTED) { close(); return false; }
+        const int socketError = lastSocketError();
+        if (isWouldBlockError(socketError)) return true;
+        if (isPeerClosedError(socketError)) { close(); return false; }
         Log::error(std::string("recv error: ") + std::to_string(socketError));
         close();
         return false;
@@ -54,38 +57,55 @@ bool Connection::tryParseFrames() {
 
 void Connection::sendMessage(const std::string& jsonPayload) {
     if (closedFlag) return;
-    std::vector<char> frame;
+    compactOutputBuffer();
     const uint32_t payloadLength = static_cast<uint32_t>(jsonPayload.size());
-    frame.push_back(static_cast<char>(payloadLength >> 24));
-    frame.push_back(static_cast<char>(payloadLength >> 16));
-    frame.push_back(static_cast<char>(payloadLength >> 8));
-    frame.push_back(static_cast<char>(payloadLength));
-    frame.insert(frame.end(), jsonPayload.begin(), jsonPayload.end());
-    if (!writeAll(frame.data(), frame.size())) {
-        Log::error("send failed, closing");
-        close();
-    }
+    outputBuffer.push_back(static_cast<char>(payloadLength >> 24));
+    outputBuffer.push_back(static_cast<char>(payloadLength >> 16));
+    outputBuffer.push_back(static_cast<char>(payloadLength >> 8));
+    outputBuffer.push_back(static_cast<char>(payloadLength));
+    outputBuffer.insert(outputBuffer.end(), jsonPayload.begin(), jsonPayload.end());
+    onWritable();
 }
 
-bool Connection::writeAll(const char* data, size_t length) {
-    size_t sentBytes = 0;
-    while (sentBytes < length) {
-        const int writtenBytes = send(socketHandle, data + sentBytes,
-                                      static_cast<int>(length - sentBytes), 0);
+void Connection::onWritable() {
+    while (!closedFlag && hasPendingOutput()) {
+#ifdef _WIN32
+        const int sendFlags = 0;
+#else
+        const int sendFlags = MSG_NOSIGNAL;
+#endif
+        const int writtenBytes = send(socketHandle, outputBuffer.data() + outputOffset,
+                                      static_cast<int>(outputBuffer.size() - outputOffset),
+                                      sendFlags);
         if (writtenBytes > 0) {
-            sentBytes += static_cast<size_t>(writtenBytes);
+            outputOffset += static_cast<std::size_t>(writtenBytes);
             continue;
         }
-        const int socketError = WSAGetLastError();
-        if (socketError == WSAEWOULDBLOCK) { Sleep(1); continue; }  // v1 简化：小响应几乎不会触发
-        return false;
+        const int socketError = lastSocketError();
+        if (isWouldBlockError(socketError))
+            return;
+        Log::error("send failed, closing: " + std::to_string(socketError));
+        close();
+        return;
     }
-    return true;
+    compactOutputBuffer();
+}
+
+void Connection::compactOutputBuffer() {
+    if (outputOffset == 0)
+        return;
+    if (outputOffset >= outputBuffer.size()) {
+        outputBuffer.clear();
+        outputOffset = 0;
+        return;
+    }
+    outputBuffer.erase(outputBuffer.begin(), outputBuffer.begin() + outputOffset);
+    outputOffset = 0;
 }
 
 void Connection::close() {
     if (closedFlag) return;
     closedFlag = true;
-    closesocket(socketHandle);
+    closeSocket(socketHandle);
     if (closeCallback) closeCallback(this);
 }

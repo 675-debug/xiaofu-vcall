@@ -11,6 +11,21 @@ bool DbManager::open(const std::string& dbPath) {
         close();
         return false;
     }
+    // 必须先设置忙等待，再让多个 worker 同时协商 WAL，避免第二个连接立即返回 SQLITE_BUSY。
+    sqlite3_busy_timeout(db, 3000);
+    const char* workerPragmas =
+        "PRAGMA busy_timeout=3000;"
+        "PRAGMA journal_mode=WAL;"
+        "PRAGMA synchronous=NORMAL;"
+        "PRAGMA foreign_keys=ON;";
+    char* errorMessage = nullptr;
+    if (sqlite3_exec(db, workerPragmas, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        Log::error(std::string("configure db failed: ")
+                   + (errorMessage ? errorMessage : "unknown"));
+        sqlite3_free(errorMessage);
+        close();
+        return false;
+    }
     return true;
 }
 

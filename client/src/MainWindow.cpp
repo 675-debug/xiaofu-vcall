@@ -10,6 +10,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QtGlobal>
 
 const QSize MainWindow::kAuthWindowSize = QSize(900, 930);
 const QSize MainWindow::kWorkspaceWindowSize = QSize(1650, 1000);
@@ -42,8 +43,14 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::initNetwork() {
-    qDebug() << "[MainWindow] connect server:" << "127.0.0.1" << 9000;
-    networkManager->connectToServer("127.0.0.1", 9000);
+    // 正式客户端默认连接云服务器；开发测试可通过环境变量覆盖，无需修改源码。
+    const QString serverHost = qEnvironmentVariable("XIAOFU_SERVER_HOST", "8.137.152.134");
+    bool portValid = false;
+    const int configuredPort = qEnvironmentVariableIntValue("XIAOFU_SERVER_PORT", &portValid);
+    const quint16 serverPort = portValid && configuredPort > 0 && configuredPort <= 65535
+        ? static_cast<quint16>(configuredPort) : static_cast<quint16>(9000);
+    qDebug() << "[MainWindow] connect server:" << serverHost << serverPort;
+    networkManager->connectToServer(serverHost, serverPort);
 }
 
 void MainWindow::showAuthPage(int index) {
@@ -74,8 +81,8 @@ void MainWindow::setupConnections() {
     connect(ui->mainPage, &MainWidget::switchToChat, this, [this]() {
         showWorkspacePage(4);
     });
-    connect(ui->mainPage, &MainWidget::switchToCall, this, [this]() {
-        ui->callPage->startDemoCall();
+    connect(ui->mainPage, &MainWidget::switchToCall, this, [this](const QString& peerName) {
+        ui->callPage->startOutgoingCall(peerName);
         showWorkspacePage(5);
     });
     connect(ui->mainPage, &MainWidget::logoutRequested, this, [this]() {
@@ -88,14 +95,17 @@ void MainWindow::setupConnections() {
     connect(ui->chatPage, &ChatWidget::backToMain, this, [this]() {
         showWorkspacePage(0);
     });
-    connect(ui->chatPage, &ChatWidget::startCall, this, [this]() {
-        ui->callPage->startDemoCall();
+    connect(ui->chatPage, &ChatWidget::startCall, this, [this](const QString& peerName) {
+        ui->callPage->startOutgoingCall(peerName);
         showWorkspacePage(5);
     });
 
     // 通话界面 → 返回主界面
     connect(ui->callPage, &CallWidget::backToMainWidget, this, [this]() {
         showWorkspacePage(0);
+    });
+    connect(ui->callPage, &CallWidget::incomingCallRequested, this, [this]() {
+        showWorkspacePage(5);
     });
 
     // 登录成功 → 主界面

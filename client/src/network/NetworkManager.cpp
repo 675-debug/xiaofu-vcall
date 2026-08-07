@@ -158,6 +158,18 @@ void NetworkManager::respondToFriendRequest(const QString& sender, bool accepted
     qDebug() << "[Network] friend request response:" << sender << accepted;
 }
 
+void NetworkManager::sendCallSignal(const QVariantMap& signal) {
+    if (loggedInUsername.isEmpty() || tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        qDebug() << "[Network] call signal ignored: not connected or not logged in";
+        return;
+    }
+
+    const QJsonObject request = QJsonObject::fromVariantMap(signal);
+    qDebug() << "[Network] call signal:" << request.value("type").toString()
+             << "to=" << request.value("to").toString();
+    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+}
+
 QString NetworkManager::currentUsername() const {
     return loggedInUsername;
 }
@@ -251,6 +263,14 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
     } else if (type == "friend_accepted_push") {
         qDebug() << "[Network] friend request accepted by:" << response.value("username").toString();
         requestContacts();
+    } else if (type == "call_signal_resp") {
+        emit callSignalSendResult(response.value("signalType").toString(), code, message);
+    } else if (type == "call_request" || type == "call_accept" || type == "call_reject"
+               || type == "call_hangup" || type == "webrtc_offer" || type == "webrtc_answer"
+               || type == "ice_candidate") {
+        qDebug() << "[Network] call signal received:" << type
+                 << "from=" << response.value("from").toString();
+        emit callSignalReceived(response.toVariantMap());
     } else if (type == "chat_resp") {
         const QJsonObject chatMessage = response.value("message").toObject();
         emit chatSendResult(chatMessage.value("to").toString(), response.value("online").toBool(), code, message);

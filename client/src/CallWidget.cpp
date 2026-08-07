@@ -1,12 +1,21 @@
 #include "CallWidget.h"
 #include "ui_CallWidget.h"
 #include "network/NetworkManager.h"
+#include "video/VideoCallController.h"
+#include "video/WebRtcBridge.h"
 #include <QEvent>
+#include <QDialog>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QResizeEvent>
 #include <QStyle>
 #include <QTimer>
+#include <QUrl>
+#include <QWebChannel>
+#include <QWebEnginePage>
+#include <QWebEngineView>
 #include <QtGlobal>
 
 namespace {
@@ -35,6 +44,7 @@ CallWidget::CallWidget(QWidget* parent)
     ui->btnPip->show();
     ui->btnPip->raise();
     resetPipPosition();
+    setupWebRtcView();
 }
 
 CallWidget::~CallWidget() {
@@ -43,34 +53,51 @@ CallWidget::~CallWidget() {
 
 void CallWidget::setNetworkManager(NetworkManager* manager) {
     networkManager = manager;
-}
+    if (!networkManager || !callController)
+        return;
 
-void CallWidget::startDemoCall() {
-    ui->callStack->setCurrentIndex(0);
-    ui->moreMenu->setVisible(false);
-    pipExpanded = false;
-    pipDragging = false;
-    ignoreNextPipClick = false;
-    ui->btnPip->setFixedSize(220, 300);
-    const int currentSerial = ++demoCallSerial;
-
-    // 静态演示：每次进入页面都先展示呼叫状态，再自动进入通话画面。
-    // TODO: 后续收到对端 accept 信令后再切换到通话中页面并启动通话计时。
-    QTimer::singleShot(1400, this, [this, currentSerial]() {
-        if (currentSerial == demoCallSerial && ui->callStack->currentIndex() == 0) {
-            ui->callStack->setCurrentIndex(1);
-            resetPipPosition();
+    connect(networkManager, &NetworkManager::callSignalReceived, this, [this](const QVariantMap& signal) {
+        const QString type = signal.value(QStringLiteral("type")).toString();
+        const QString peerName = signal.value(QStringLiteral("from")).toString();
+        if (type == QStringLiteral("call_request")) {
+            callController->receiveIncomingCall(peerName);
+            if (callController->state() == VideoCallController::IncomingRinging) {
+                emit incomingCallRequested();
+                showIncomingCallDialog(peerName);
+            }
+            return;
+        }
+        callController->handleRemoteSignal(signal);
+    });
+    connect(networkManager, &NetworkManager::callSignalSendResult, this,
+            [this](const QString& signalType, int code, const QString& message) {
+        if (code != 0 && callController->state() != VideoCallController::Idle) {
+            qDebug() << "[Call] signal send failed:" << signalType << message;
+            callController->endCall();
+            emit backToMainWidget();
         }
     });
 }
 
+void CallWidget::startOutgoingCall(const QString& peerName) {
+    if (!callController || peerName.isEmpty())
+        return;
+
+    ui->avatarRinging->setText(peerName.left(1).toUpper());
+    ui->nameRinging->setText(peerName);
+    ui->statusPill->setText(QStringLiteral("正在呼叫…"));
+    ui->hintRinging->setText(QStringLiteral("等待对方接听…"));
+    ui->callStack->setCurrentIndex(0);
+    callController->startOutgoingCall(peerName);
+}
+
 void CallWidget::on_btnCancelCall_clicked() {
-    // TODO: 后续通过信令服务器通知对端取消呼叫并释放待建立的 RTP 会话。
+    callController->endCall();
     emit backToMainWidget();
 }
 
 void CallWidget::on_btnHangup_clicked() {
-    // TODO: 后续通过信令服务器通知对端结束通话并释放 RTP 会话。
+    callController->endCall();
     if (window()->isFullScreen())
         window()->showNormal();
     emit backToMainWidget();
@@ -82,7 +109,7 @@ void CallWidget::on_btnMic_clicked() {
     ui->btnMic->setToolTip(microphoneEnabled ? QStringLiteral("关闭麦克风")
                                               : QStringLiteral("打开麦克风"));
     refreshButtonStyle(ui->btnMic);
-    // TODO: 后续调用 FFmpeg 音频采集模块启停麦克风轨道。
+    // TODO: 后续接入 WebRTC 音频轨道后，在这里切换麦克风状态。
 }
 
 void CallWidget::on_btnCam_clicked() {
@@ -90,10 +117,8 @@ void CallWidget::on_btnCam_clicked() {
     ui->btnCam->setProperty("active", cameraEnabled);
     ui->btnCam->setToolTip(cameraEnabled ? QStringLiteral("关闭摄像头")
                                           : QStringLiteral("打开摄像头"));
-    ui->btnPip->setText(cameraEnabled ? QStringLiteral("我的视频")
-                                      : QStringLiteral("摄像头已关闭"));
     refreshButtonStyle(ui->btnCam);
-    // TODO: 后续调用 FFmpeg 摄像头采集模块启停视频轨道。
+    webRtcBridge->setCameraEnabled(cameraEnabled);
 }
 
 void CallWidget::on_btnPip_clicked() {
@@ -151,6 +176,7 @@ bool CallWidget::eventFilter(QObject* watched, QEvent* event) {
 void CallWidget::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
     clampPipPosition();
+    updateWebRtcGeometry();
 }
 
 void CallWidget::clampPipPosition() {
@@ -250,4 +276,120 @@ void CallWidget::refreshButtonStyle(QWidget* widget) {
     widget->style()->unpolish(widget);
     widget->style()->polish(widget);
     widget->update();
+}
+
+void CallWidget::setupWebRtcView() {
+    webRtcView = new QWebEngineView(ui->viewIncall);
+    webRtcView->setAttribute(Qt::WA_StyledBackground, true);
+    webRtcView->setStyleSheet(QStringLiteral("background:#1A1A2E; border:1px solid #6B6B6B;"));
+    webRtcView->lower();
+    ui->btnPip->hide();
+
+    webChannel = new QWebChannel(webRtcView->page());
+    webRtcBridge = new WebRtcBridge(this);
+    webRtcBridge->setPage(webRtcView->page());
+    webChannel->registerObject(QStringLiteral("webRtcBridge"), webRtcBridge);
+    webRtcView->page()->setWebChannel(webChannel);
+
+    callController = new VideoCallController(this);
+    callController->setBridge(webRtcBridge);
+    connect(callController, &VideoCallController::signalReadyToSend,
+            this, [this](const QVariantMap& signal) {
+        if (networkManager)
+            networkManager->sendCallSignal(signal);
+    });
+    connect(callController, &VideoCallController::stateChanged,
+            this, [this](VideoCallController::CallState) { updateCallPageForState(); });
+    connect(webRtcBridge, &WebRtcBridge::callError, this, [](const QString& message) {
+        qDebug() << "[Call] WebRTC error:" << message;
+    });
+
+    connect(webRtcView, &QWebEngineView::loadFinished, this, [this](bool loaded) {
+        webRtcPageReady = loaded;
+        if (!loaded)
+            return;
+        if (ui->callStack->currentIndex() == 1)
+            webRtcBridge->startPreview();
+    });
+    connect(webRtcView->page(), &QWebEnginePage::featurePermissionRequested,
+            this, [this](const QUrl& origin, QWebEnginePage::Feature feature) {
+        const auto permission = feature == QWebEnginePage::MediaVideoCapture
+                                    ? QWebEnginePage::PermissionGrantedByUser
+                                    : QWebEnginePage::PermissionDeniedByUser;
+        // 只允许摄像头权限；音频功能留待后续独立实现。
+        webRtcView->page()->setFeaturePermission(origin, feature, permission);
+    });
+
+    updateWebRtcGeometry();
+    webRtcView->setUrl(QUrl(QStringLiteral("qrc:///video/video_call.html")));
+}
+
+void CallWidget::updateWebRtcGeometry() {
+    if (!webRtcView || !ui || !ui->viewIncall)
+        return;
+    webRtcView->setGeometry(ui->viewIncall->rect());
+    webRtcView->lower();
+}
+
+void CallWidget::showIncomingCallDialog(const QString& peerName) {
+    QDialog dialog(this);
+    dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    dialog.setModal(true);
+    dialog.setFixedSize(390, 232);
+    dialog.setStyleSheet(
+        "QDialog{background:#1A1A2E;border:1px solid #6B6B6B;border-radius:14px;}"
+        "QLabel{color:#FFFFFF;background:transparent;}"
+        "QPushButton{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}"
+        "QPushButton#rejectButton{background:rgba(255,255,255,36);color:#FFFFFF;border:1px solid rgba(255,255,255,55);}"
+        "QPushButton#acceptButton{background:#007AFF;color:#FFFFFF;border:none;}");
+
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(28, 24, 28, 24);
+    layout->setSpacing(12);
+    auto* title = new QLabel(QStringLiteral("视频通话邀请"), &dialog);
+    title->setStyleSheet("font-size:17px;font-weight:700;");
+    auto* description = new QLabel(QStringLiteral("%1 邀请你进行视频通话").arg(peerName), &dialog);
+    description->setStyleSheet("font-size:13px;color:rgba(255,255,255,180);");
+    layout->addWidget(title);
+    layout->addWidget(description);
+    layout->addStretch();
+    auto* buttonRow = new QHBoxLayout;
+    auto* rejectButton = new QPushButton(QStringLiteral("拒绝"), &dialog);
+    rejectButton->setObjectName(QStringLiteral("rejectButton"));
+    auto* acceptButton = new QPushButton(QStringLiteral("接听"), &dialog);
+    acceptButton->setObjectName(QStringLiteral("acceptButton"));
+    buttonRow->addWidget(rejectButton);
+    buttonRow->addWidget(acceptButton);
+    layout->addLayout(buttonRow);
+    bool accepted = false;
+    connect(rejectButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(acceptButton, &QPushButton::clicked, &dialog, [&dialog, &accepted]() {
+        accepted = true;
+        dialog.accept();
+    });
+    dialog.exec();
+    if (accepted)
+        callController->acceptIncomingCall();
+    else
+        callController->rejectIncomingCall();
+}
+
+void CallWidget::updateCallPageForState() {
+    if (!callController)
+        return;
+
+    const VideoCallController::CallState state = callController->state();
+    if (state == VideoCallController::Connecting || state == VideoCallController::InCall) {
+        ui->callStack->setCurrentIndex(1);
+        // QStackedWidget 切页后尺寸会在下一轮事件循环才完成，避免 WebEngine 保留初始 640×480 大小。
+        QTimer::singleShot(0, this, [this]() {
+            updateWebRtcGeometry();
+        });
+        ui->btnPip->hide();
+        ui->avatarIncall->hide();
+        ui->nameIncall->hide();
+        ui->statusIncall->hide();
+        if (webRtcPageReady)
+            webRtcBridge->startPreview();
+    }
 }
