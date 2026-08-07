@@ -1,0 +1,25 @@
+[Unit]
+Description=xiaofu-vcall epoll server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xiaofu
+Group=xiaofu
+WorkingDirectory=/opt/xiaofu-vcall
+Environment=XIAOFU_DATA_DIR=/var/lib/xiaofu-vcall
+ExecStart=/opt/xiaofu-vcall/bin/xiaofu-server --host 0.0.0.0 --port 9000 --workers 2
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=4096
+
+# 基础隔离；数据库目录通过 ReadWritePaths 单独开放写权限。
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/xiaofu-vcall
+
+[Install]
+WantedBy=multi-user.target

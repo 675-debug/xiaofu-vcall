@@ -36,6 +36,7 @@ stderr*.txt
 # IDE / editor settings
 .idea/
 .vscode/
+client/.qtc_clangd/
 *.user
 
 # Local UI backups and verification screenshots
@@ -48,6 +49,7 @@ docs/tmp-ui-specs/
 /UI/
 /docs/
 !/docs/
+/docs/*
 !/docs/video-call-technical-plan.md
 /mermaid-diagram*.svg
 /*.md
