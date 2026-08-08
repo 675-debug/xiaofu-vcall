@@ -1,4 +1,4 @@
-QT += core gui widgets network webenginewidgets webchannel
+QT += core gui widgets network multimedia webenginewidgets webchannel
 TARGET = xiaofu-vcall-client
 TEMPLATE = app
 CONFIG += c++11

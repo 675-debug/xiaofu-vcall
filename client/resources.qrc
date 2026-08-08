@@ -1,7 +1,6 @@
-﻿<RCC>
+<RCC>
     <qresource prefix="/icons">
         <file alias="icon-user.png">resources/icons/icon-user.png</file>
-        <file alias="icon-mail.png">resources/icons/icon-mail.png</file>
         <file alias="icon-lock.png">resources/icons/icon-lock.png</file>
         <file alias="win-min.png">resources/icons/win-min.png</file>
         <file alias="win-max.png">resources/icons/win-max.png</file>
@@ -11,12 +10,26 @@
         <file alias="icon-mic.png">resources/icons/icon-mic.png</file>
         <file alias="icon-cam.png">resources/icons/icon-cam.png</file>
         <file alias="icon-message.png">resources/icons/icon-message.png</file>
-        <file alias="icon-mic-new.png">../UI/icons/maikefeng.png</file>
-        <file alias="icon-cam-new.png">../UI/icons/shexiangtou.png</file>
-        <file alias="icon-more.png">../UI/icons/gengduo.png</file>
+        <file alias="icon-mic-new.png">resources/icons/maikefeng.png</file>
+        <file alias="icon-cam-new.png">resources/icons/shexiangtou.png</file>
+        <file alias="icon-more.png">resources/icons/gengduo.png</file>
     </qresource>
     <qresource prefix="/video">
         <file alias="video_call.html">resources/video/video_call.html</file>
+        <file alias="audio_debug.js">resources/video/audio_debug.js</file>
         <file alias="video_call.js">resources/video/video_call.js</file>
+        <file alias="webrtc/core.js">resources/video/webrtc/core.js</file>
+        <file alias="webrtc/logger.js">resources/video/webrtc/logger.js</file>
+        <file alias="webrtc/state.js">resources/video/webrtc/state.js</file>
+        <file alias="webrtc/bridge.js">resources/video/webrtc/bridge.js</file>
+        <file alias="webrtc/media.js">resources/video/webrtc/media.js</file>
+        <file alias="webrtc/ice.js">resources/video/webrtc/ice.js</file>
+        <file alias="webrtc/stats.js">resources/video/webrtc/stats.js</file>
+        <file alias="webrtc/probe.js">resources/video/webrtc/probe.js</file>
+        <file alias="webrtc/peer.js">resources/video/webrtc/peer.js</file>
+        <file alias="webrtc/ui.js">resources/video/webrtc/ui.js</file>
+        <file alias="webrtc/screen.js">resources/video/webrtc/screen.js</file>
+        <file alias="webrtc/recorder.js">resources/video/webrtc/recorder.js</file>
+        <file alias="webrtc/signaling.js">resources/video/webrtc/signaling.js</file>
     </qresource>
 </RCC>

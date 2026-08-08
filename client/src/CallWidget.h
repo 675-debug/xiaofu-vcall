@@ -21,6 +21,8 @@ public:
 
     void setNetworkManager(NetworkManager* manager);
     void startOutgoingCall(const QString& peerName);
+    // 本地预览自测：不发起通话，直接进入通话页并打开摄像头（XIAOFU_PREVIEW_TEST=1）。
+    void showLocalPreviewTest();
 
 signals:
     void backToMainWidget();
@@ -32,27 +34,20 @@ protected:
 
 private slots:
     void on_btnCancelCall_clicked();
-    void on_btnHangup_clicked();
-    void on_btnMic_clicked();
-    void on_btnCam_clicked();
     void on_btnPip_clicked();
-    void on_btnMore_clicked();
-    void on_btnShare_clicked();
-    void on_btnRecord_clicked();
-    void on_btnSpeaker_clicked();
-    void on_btnFullscreen_clicked();
     void on_btnMin_clicked();
     void on_btnMax_clicked();
     void on_btnClose_clicked();
 
 private:
-    void refreshButtonStyle(QWidget* widget);
     void clampPipPosition();
     void resetPipPosition();
     void setupWebRtcView();
+    void scanCameraDevices();
     void updateWebRtcGeometry();
     void showIncomingCallDialog(const QString& peerName);
     void updateCallPageForState();
+    void showCallErrorAndBack(const QString& message);
 
     Ui::CallWidget* ui;
     NetworkManager* networkManager = nullptr;
@@ -61,13 +56,8 @@ private:
     WebRtcBridge* webRtcBridge = nullptr;
     VideoCallController* callController = nullptr;
     bool webRtcPageReady = false;
-    bool microphoneEnabled = true;
-    bool cameraEnabled = true;
+    bool previewTestActive = false;
     bool pipExpanded = false;
-    bool sharingEnabled = false;
-    bool recordingEnabled = false;
-    bool speakerEnabled = true;
-    bool fullScreenEnabled = false;
     QPoint pipPressGlobalPosition;
     QPoint pipStartPosition;
     bool pipDragging = false;

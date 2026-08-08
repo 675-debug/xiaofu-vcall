@@ -55,3 +55,12 @@ docs/tmp-ui-specs/
 /*.md
 !README.md
 /LICENSE
+
+# Local packaged release output (never publish)
+dist/
+
+# Linux launcher with real TURN credential (never publish)
+client/start_video_call.sh
+
+# Local backup files
+*.bak*

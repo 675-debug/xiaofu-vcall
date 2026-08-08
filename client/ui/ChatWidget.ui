@@ -20,7 +20,7 @@
    <string>xiaofu-vcal 客户端 · 发消息</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">#ChatWidget{background:#FFFFFF;font-family:"Microsoft YaHei UI";}
+   <string notr="true">#ChatWidget{background:#FFFFFF;font-family:&quot;Microsoft YaHei UI&quot;;}
 #titleBar{background:#FFFFFF;border-bottom:1px solid #E8E8ED;}
 #titleLabel{font-size:13px;font-weight:600;color:#48484A;}
 QToolButton#btnMin,QToolButton#btnMax,QToolButton#btnClose{border:none;border-radius:8px;}
@@ -55,7 +55,16 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
    <property name="spacing">
     <number>0</number>
    </property>
-   <property name="margin">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
     <number>0</number>
    </property>
    <item>
@@ -136,9 +145,8 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
          <string>最小化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -166,9 +174,8 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
          <string>最大化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -196,9 +203,8 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
          <string>关闭</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -217,7 +223,16 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
       <property name="spacing">
        <number>0</number>
       </property>
-      <property name="margin">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
        <number>0</number>
       </property>
       <item>
@@ -238,7 +253,16 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
          <property name="spacing">
           <number>0</number>
          </property>
-         <property name="margin">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
           <number>0</number>
          </property>
          <item>
@@ -264,7 +288,16 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
          <property name="spacing">
           <number>0</number>
          </property>
-         <property name="margin">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
           <number>0</number>
          </property>
          <item>
@@ -371,9 +404,8 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
                <string>视频通话</string>
               </property>
               <property name="icon">
-               <iconset resource="resources.qrc">
-                <normaloff>:/icons/icon-call.png</normaloff>:/icons/icon-call.png
-               </iconset>
+               <iconset resource="../resources.qrc">
+                <normaloff>:/icons/icon-call.png</normaloff>:/icons/icon-call.png</iconset>
               </property>
               <property name="iconSize">
                <size>
@@ -476,7 +508,7 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
   </layout>
  </widget>
  <resources>
-  <include location="resources.qrc"/>
+  <include location="../resources.qrc"/>
  </resources>
  <connections/>
 </ui>

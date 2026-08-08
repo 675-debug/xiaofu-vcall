@@ -2,6 +2,8 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 
 class QWebEnginePage;
@@ -18,8 +20,26 @@ public:
     void setCameraEnabled(bool enabled);
     void stopCall();
     void applyRemoteSignal(const QVariantMap& signal);
+    // 配置 WebRTC ICE 服务器（STUN/TURN），必须在创建 RTCPeerConnection 之前注入。
+    void setIceServers(const QVariantList& servers);
+    // 页面加载完成后把 C++ 侧暂存的 ICE 配置推送给 JS。
+    void applyIceServers();
+    // 配置 ICE 传输策略：'relay' 强制所有媒体走 TURN 中继（诊断直连路径问题），空/其他值恢复默认。
+    void setIcePolicy(const QString& policy);
+    // 页面加载完成后把 C++ 侧暂存的 ICE 策略推送给 JS。
+    void applyIcePolicy();
+    // 配置候选诊断过滤模式：'ipv4-udp-host-only'/'no-ipv6'/'no-tcp'（诊断候选路径问题），空/其他值恢复默认。
+    void setDiagFilter(const QString& mode);
+    void setCameraProbeEnabled(bool enabled);
+    void applyCameraProbeEnabled();
+    // 页面加载完成后把 C++ 侧暂存的诊断过滤模式推送给 JS。
+    void applyDiagFilter();
+    // R10：屏幕共享/录制的 UI foundation 开关，仅驱动 JS 能力探测与基础状态，不真正采集/保存。
+    void toggleScreenShare();
+    void toggleRecording();
 
 public slots:
+    void requestHangup();
     void reportPreviewReady(const QVariantMap& settings);
     void reportCallError(const QString& message);
     void reportOutgoingSignal(const QVariantMap& signal);
@@ -30,9 +50,15 @@ signals:
     void callError(const QString& message);
     void outgoingSignal(const QVariantMap& signal);
     void callStateChanged(const QString& state);
+    void hangupRequested();
 
 private:
     void runPageScript(const QString& script);
 
     QPointer<QWebEnginePage> page;
+    QVariantList pendingIceServers;
+    QString pendingIcePolicy;
+    QString pendingDiagFilter;
+    bool pendingCameraProbeEnabled = false;
 };
+

@@ -12,7 +12,11 @@ $requiredFragments = @(
     'height: { ideal: 480 }',
     'frameRate: { ideal: 30, max: 30 }',
     'audio: false',
-    'RTCPeerConnection'
+    'RTCPeerConnection',
+    'function addLocalTracksOnce',
+    'peerConnection.getSenders()',
+    'function isCameraNotFound',
+    'callToken'
 )
 
 foreach ($fragment in $requiredFragments) {

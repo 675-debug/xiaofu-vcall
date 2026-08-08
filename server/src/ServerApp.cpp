@@ -50,6 +50,37 @@ JsonValue friendRequestToJson(const FriendRequest& request)
     return jsonRequest;
 }
 
+std::string sdpVideoDiagnostics(const std::string& sdp)
+{
+    if (sdp.empty())
+        return "videoSection=none";
+    const std::size_t mVideo = sdp.find("m=video");
+    if (mVideo == std::string::npos)
+        return "videoSection=none";
+    const std::size_t nextM = sdp.find("\nm=", mVideo + 1);
+    const std::string section = nextM == std::string::npos
+        ? sdp.substr(mVideo)
+        : sdp.substr(mVideo, nextM - mVideo);
+    std::string direction = "implicit-sendrecv";
+    if (section.find("a=sendrecv") != std::string::npos)
+        direction = "sendrecv";
+    else if (section.find("a=sendonly") != std::string::npos)
+        direction = "sendonly";
+    else if (section.find("a=recvonly") != std::string::npos)
+        direction = "recvonly";
+    else if (section.find("a=inactive") != std::string::npos)
+        direction = "inactive";
+    const bool hasMsid = section.find("a=msid:") != std::string::npos;
+    std::size_t ssrcCount = 0;
+    std::size_t pos = 0;
+    while ((pos = section.find("a=ssrc:", pos)) != std::string::npos) {
+        ++ssrcCount;
+        pos += 8;
+    }
+    return "videoDirection=" + direction + " msid=" + (hasMsid ? "yes" : "no")
+        + " ssrc=" + std::to_string(ssrcCount);
+}
+
 } // namespace
 
 ServerApp::ServerApp(std::string databasePath, std::size_t workerCount)
@@ -613,6 +644,11 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
                   JsonValue(static_cast<int>(request.get("sdpMLineIndex").asNumber())));
         sendTo(receiverConnectionId, relay.serialize());
         Log::info("call signal relayed: " + type + " " + currentUsername + " -> " + receiver);
+        if (type == "webrtc_offer" || type == "webrtc_answer") {
+            const std::string sdp = request.get("sdp").asString();
+            Log::info("sdp diag: " + type + " " + currentUsername + " -> " + receiver + " "
+                      + sdpVideoDiagnostics(sdp));
+        }
         return;
     }
 

@@ -113,6 +113,12 @@ void MainWindow::setupConnections() {
         qDebug() << "[MainWindow] login succeeded, switch workspace:" << username;
         ui->mainPage->setCurrentUser(username);
         showWorkspacePage(0);
+        // 本地预览自测：XIAOFU_PREVIEW_TEST=1 时不打电话，登录后直接进通话页打开摄像头。
+        if (qEnvironmentVariableIntValue("XIAOFU_PREVIEW_TEST") == 1) {
+            qDebug().noquote() << "[MainWindow] local preview test mode enabled";
+            ui->callPage->showLocalPreviewTest();
+            showWorkspacePage(5);
+        }
     });
 }
 

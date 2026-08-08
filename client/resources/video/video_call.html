@@ -1,29 +1,105 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>小福视频通话</title>
+    <title>视频通话</title>
     <style>
-        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #1a1a2e; }
-        #call-stage { position: relative; width: 100%; height: 100%; background: #24243a; }
+        html, body { width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; overflow: hidden; background: #1a1a2e; }
+        #call-stage { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; background: #24243a; }
+        #call-stage:fullscreen, #call-stage:-webkit-full-screen { width: 100%; height: 100%; min-width: 0; min-height: 0; }
         video { display: block; object-fit: cover; background: #2d2d44; }
         #remote-video { width: 100%; height: 100%; }
-        #local-video { position: absolute; top: 16px; right: 26px; width: 220px; height: 300px;
+        #local-pip { position: absolute; top: 16px; right: 26px; width: 220px; height: 300px;
             border: 1px solid rgba(255,255,255,.32); border-radius: 14px; cursor: grab;
-            box-shadow: 0 10px 30px rgba(0,0,0,.28); }
-        #local-video:active { cursor: grabbing; }
+            box-shadow: 0 10px 30px rgba(0,0,0,.28); overflow: hidden; background: #101018; }
+        #local-pip:active { cursor: grabbing; }
+        #local-video { width: 100%; height: 100%; }
+        #local-camera-overlay { position: absolute; inset: 0; display: flex; align-items: center;
+            justify-content: center; color: rgba(255,255,255,.72); font: 13px "Microsoft YaHei UI", sans-serif;
+            background: #101018; text-align: center; }
+        #local-camera-overlay.hidden { display: none; }
         #empty-state { position: absolute; inset: 0; display: flex; align-items: center;
             justify-content: center; color: rgba(255,255,255,.62); font: 14px "Microsoft YaHei UI", sans-serif; }
+        #call-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+            display: flex; align-items: center; justify-content: center; gap: 11px;
+            z-index: 2000; background: linear-gradient(transparent, rgba(0,0,0,.55));
+            pointer-events: none; }
+        #call-controls button { margin: 0; }
+        #call-controls button { pointer-events: auto; width: 48px; height: 48px; padding: 0;
+            border: none; outline: none; border-radius: 50%; background: rgba(255,255,255,.18); color: #FFFFFF;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: none; -webkit-tap-highlight-color: transparent; }
+        #call-controls button:hover { background: rgba(255,255,255,.32); }
+        #call-controls button[data-active="false"] { opacity: .5; background: rgba(255,255,255,.1); }
+        #call-controls button:focus, #camera-profile-bar button:focus, #more-popover button:focus,
+        #call-controls button:active, #camera-profile-bar button:active, #more-popover button:active { outline: none; }
+        #call-controls button:focus-visible, #camera-profile-bar button:focus-visible, #more-popover button:focus-visible { outline: none; background: rgba(255,255,255,.28); }
+        #more-popover button:focus-visible { outline: none; background: rgba(0,0,0,.08); }
+        #more-popover button:disabled { opacity: .5; cursor: default; }
+        #more-popover button:disabled:hover { background: transparent; }
+        #more-popover button[data-unsupported="true"] { opacity: .5; }
+        #more-popover button[data-unsupported="true"]:hover { background: transparent; }
+        #call-controls button img { width: 24px; height: 24px; pointer-events: none; }
+        #hangup-button { background: #FF3B30; color: #FFFFFF; }
+        #hangup-button:hover { background: #E0352B; }
+        #more-popover { position: fixed; z-index: 3000; min-width: 128px;
+            background: #FFFFFF; color: #1A1A2E; border-radius: 8px;
+            box-shadow: none; -webkit-box-shadow: none; filter: none; border: 1px solid rgba(0,0,0,.08); padding: 4px; }
+        #more-popover button { pointer-events: auto; display: block; width: 100%;
+            min-width: 0; height: 32px; padding: 0 10px; border: none; border-radius: 6px;
+            font-size: 12px; text-align: left; background: transparent; color: #1A1A2E; }
+        #more-popover button:hover { background: rgba(0,0,0,.06); }
+        #more-popover button[data-active="true"] { background: #E8F1FF; color: #007AFF; font-weight: 600; }
+        #more-popover.hidden { display: none; }
+        #camera-profile-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 78px;
+            display: flex; align-items: center; gap: 8px; z-index: 1500;
+            background: rgba(0,0,0,.45); border-radius: 18px; padding: 6px 10px; }
+        #camera-profile-bar button { pointer-events: auto; min-width: 72px; height: 30px; padding: 0 12px;
+            border: none; border-radius: 15px; font-size: 12px; background: rgba(255,255,255,.16);
+            color: #FFFFFF; cursor: pointer; }
+        #camera-profile-bar button:hover { background: rgba(255,255,255,.3); }
+        #camera-profile-bar button[data-active="true"] { background: #007AFF; color: #FFFFFF; font-weight: 600; }
+        #camera-profile-bar button:disabled { opacity: .5; cursor: default; }
     </style>
 </head>
 <body>
     <main id="call-stage">
         <video id="remote-video" autoplay playsinline></video>
-        <video id="local-video" autoplay muted playsinline></video>
-        <div id="empty-state">正在准备摄像头…</div>
+        <div id="local-pip">
+            <video id="local-video" autoplay muted playsinline></video>
+            <div id="local-camera-overlay" class="hidden">暂无摄像头</div>
+        </div>
+        <div id="empty-state">等待对方视频</div>
+        <div id="camera-profile-bar"></div>
+        <div id="call-controls">
+            <button id="mic-button" type="button" data-active="true" title="麦克风" aria-label="麦克风"><img src="qrc:///icons/icon-mic-new.png" alt="麦克风"></button>
+            <button id="cam-button" type="button" data-active="true" title="摄像头" aria-label="摄像头"><img src="qrc:///icons/icon-cam-new.png" alt="摄像头"></button>
+            <button id="hangup-button" type="button" title="挂断" aria-label="挂断"><img src="qrc:///icons/icon-hangup.png" alt="挂断"></button>
+            <button id="more-button" type="button" title="更多" aria-label="更多"><img src="qrc:///icons/icon-more.png" alt="更多"></button>
+            <div id="more-popover" class="hidden">
+                <button id="share-button" type="button">共享屏幕</button>
+                <button id="record-button" type="button">录制通话</button>
+                <button id="fullscreen-button" type="button">全屏</button>
+            </div>
+        </div>
     </main>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="qrc:///video/audio_debug.js"></script>
+    <script src="qrc:///video/webrtc/core.js"></script>
+    <script src="qrc:///video/webrtc/logger.js"></script>
+    <script src="qrc:///video/webrtc/state.js"></script>
+    <script src="qrc:///video/webrtc/bridge.js"></script>
+    <script src="qrc:///video/webrtc/media.js"></script>
+    <script src="qrc:///video/webrtc/ice.js"></script>
+    <script src="qrc:///video/webrtc/stats.js"></script>
+    <script src="qrc:///video/webrtc/probe.js"></script>
+    <script src="qrc:///video/webrtc/peer.js"></script>
+    <script src="qrc:///video/webrtc/signaling.js"></script>
+    <script src="qrc:///video/webrtc/ui.js"></script>
+    <script src="qrc:///video/webrtc/screen.js"></script>
+    <script src="qrc:///video/webrtc/recorder.js"></script>
     <script src="qrc:///video/video_call.js"></script>
 </body>
 </html>
+

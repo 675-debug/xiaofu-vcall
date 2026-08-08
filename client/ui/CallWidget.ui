@@ -26,7 +26,7 @@
    <string>xiaofu-vcal 客户端</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget#CallWidget,QWidget#callPage{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1A1A2E,stop:1 #2C2C2E);font-family:"Microsoft YaHei UI";}
+   <string notr="true">QWidget#CallWidget,QWidget#callPage{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1A1A2E,stop:1 #2C2C2E);font-family:&quot;Microsoft YaHei UI&quot;;}
 #titleBar{background:rgba(0,0,0,46);}
 #titleLabel{font-size:13px;font-weight:600;color:rgba(255,255,255,191);}
 QToolButton#btnMin,QToolButton#btnMax,QToolButton#btnClose{border:none;border-radius:8px;}
@@ -42,22 +42,22 @@ QPushButton#btnCancelCall:hover{background:rgba(255,255,255,66);}
 QPushButton#btnPip{background:#3A3A3C;color:rgba(255,255,255,153);border:1.5px solid rgba(255,255,255,64);border-radius:14px;font-size:12px;}
 QPushButton#btnPip:hover{background:#4A4A4C;}
 #statusIncall{color:rgba(255,255,255,128);font-size:12px;}
-QPushButton#btnMic,QPushButton#btnCam,QPushButton#btnMore{background:rgba(255,255,255,36);color:#FFFFFF;border:none;border-radius:28px;font-size:12px;}
-QPushButton#btnMic:hover,QPushButton#btnCam:hover,QPushButton#btnMore:hover{background:rgba(255,255,255,66);}
-QPushButton#btnMic[active="false"],QPushButton#btnCam[active="false"]{background:#FFFFFF;color:#1A1A2E;}
-QPushButton#btnMore[active="true"]{background:rgba(255,255,255,82);}
-QPushButton#btnHangup{background:#FF3B30;color:#FFFFFF;border:none;border-radius:32px;font-size:13px;font-weight:600;}
-QPushButton#btnHangup:hover{background:#E0352B;}
-#moreMenu{background:#FFFFFF;border-radius:12px;}
-QPushButton#btnShare,QPushButton#btnRecord,QPushButton#btnSpeaker,QPushButton#btnFullscreen{border:none;background:transparent;color:#1A1A2E;font-size:13px;border-radius:8px;padding:9px 12px;text-align:left;}
-QPushButton#btnShare:hover,QPushButton#btnRecord:hover,QPushButton#btnSpeaker:hover,QPushButton#btnFullscreen:hover{background:#F5F5F5;}
-QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushButton[active="true"]#btnSpeaker{background:#E8F1FF;color:#007AFF;font-weight:600;}</string>
+</string>
   </property>
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
     <number>0</number>
    </property>
-   <property name="margin">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
     <number>0</number>
    </property>
    <item>
@@ -128,9 +128,8 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
          <string>最小化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -158,9 +157,8 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
          <string>最大化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -188,9 +186,8 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
          <string>关闭</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -240,11 +237,11 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
            <height>34</height>
           </size>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
          <property name="text">
           <string>正在呼叫…</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
@@ -262,31 +259,31 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
            <height>110</height>
           </size>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
          <property name="text">
           <string>?</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QLabel" name="nameRinging">
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
          <property name="text">
           <string>未选择联系人</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QLabel" name="hintRinging">
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
          <property name="text">
           <string>等待对方接听…</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
@@ -434,31 +431,31 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
              <height>130</height>
             </size>
            </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
            <property name="text">
             <string>?</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QLabel" name="nameIncall">
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
            <property name="text">
             <string>未选择联系人</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QLabel" name="statusIncall">
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
            <property name="text">
             <string>已连接 · 720p</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -476,183 +473,6 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
           </size>
          </property>
         </spacer>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="ctrlRow">
-         <property name="spacing">
-          <number>18</number>
-         </property>
-         <item>
-          <spacer name="ctrlLeftSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnMic">
-           <property name="minimumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="cursor">
-            <cursorShape>PointingHandCursor</cursorShape>
-           </property>
-           <property name="toolTip">
-            <string>麦克风</string>
-           </property>
-           <property name="icon">
-            <iconset resource="resources.qrc">
-             <normaloff>:/icons/icon-mic-new.png</normaloff>:/icons/icon-mic-new.png
-            </iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>22</width>
-             <height>22</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnCam">
-           <property name="minimumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="cursor">
-            <cursorShape>PointingHandCursor</cursorShape>
-           </property>
-           <property name="toolTip">
-            <string>摄像头</string>
-           </property>
-           <property name="icon">
-            <iconset resource="resources.qrc">
-             <normaloff>:/icons/icon-cam-new.png</normaloff>:/icons/icon-cam-new.png
-            </iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>22</width>
-             <height>22</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnHangup">
-           <property name="minimumSize">
-            <size>
-             <width>64</width>
-             <height>64</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>64</width>
-             <height>64</height>
-            </size>
-           </property>
-           <property name="cursor">
-            <cursorShape>PointingHandCursor</cursorShape>
-           </property>
-           <property name="toolTip">
-            <string>挂断</string>
-           </property>
-           <property name="icon">
-            <iconset resource="resources.qrc">
-             <normaloff>:/icons/icon-hangup.png</normaloff>:/icons/icon-hangup.png
-            </iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>22</width>
-             <height>22</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnMore">
-           <property name="minimumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>56</width>
-             <height>56</height>
-            </size>
-           </property>
-           <property name="cursor">
-            <cursorShape>PointingHandCursor</cursorShape>
-           </property>
-           <property name="toolTip">
-            <string>更多</string>
-           </property>
-           <property name="icon">
-            <iconset resource="resources.qrc">
-             <normaloff>:/icons/icon-more.png</normaloff>:/icons/icon-more.png
-            </iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>22</width>
-             <height>22</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="ctrlRightSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
        </item>
        <item>
         <spacer name="incallBottomMargin">
@@ -675,67 +495,9 @@ QPushButton[active="true"]#btnShare,QPushButton[active="true"]#btnRecord,QPushBu
     </widget>
    </item>
   </layout>
-  <widget class="QFrame" name="moreMenu">
-   <property name="geometry">
-    <rect>
-     <x>1250</x>
-     <y>70</y>
-     <width>180</width>
-     <height>190</height>
-    </rect>
-   </property>
-   <property name="visible">
-    <bool>false</bool>
-   </property>
-   <layout class="QVBoxLayout" name="moreMenuLayout">
-    <property name="spacing">
-     <number>2</number>
-    </property>
-    <property name="leftMargin">
-     <number>6</number>
-    </property>
-    <property name="topMargin">
-     <number>6</number>
-    </property>
-    <property name="rightMargin">
-     <number>6</number>
-    </property>
-    <property name="bottomMargin">
-     <number>6</number>
-    </property>
-    <item>
-     <widget class="QPushButton" name="btnShare">
-      <property name="text">
-       <string>共享屏幕</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="btnRecord">
-      <property name="text">
-       <string>录制通话</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="btnSpeaker">
-      <property name="text">
-       <string>扬声器</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="btnFullscreen">
-      <property name="text">
-       <string>全屏</string>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
  </widget>
  <resources>
-  <include location="resources.qrc"/>
+  <include location="../resources.qrc"/>
  </resources>
  <connections/>
 </ui>

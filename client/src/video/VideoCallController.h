@@ -35,6 +35,8 @@ signals:
     void stateChanged(VideoCallController::CallState state);
     void peerChanged(const QString& peer);
     void signalReadyToSend(const QVariantMap& signal);
+    // 对端拒绝或挂断导致通话结束，UI 需要据此返回主页面。
+    void callEndedByPeer();
 
 private:
     void setState(CallState nextState);

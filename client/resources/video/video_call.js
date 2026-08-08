@@ -1,196 +1,331 @@
-(function () {
+﻿(function () {
     'use strict';
 
-    const localVideo = document.getElementById('local-video');
-    const remoteVideo = document.getElementById('remote-video');
-    const emptyState = document.getElementById('empty-state');
-    const state = {
-        bridge: null,
-        localStream: null,
-        peerConnection: null,
-        pendingCandidates: [],
-        cameraEnabled: true
-    };
+    var BUILD = '2026-08-08-r10.2.4-ui-recorder-fullscreen-fix';
 
-    function notifyError(error) {
-        const message = error && error.message ? error.message : String(error);
-        if (state.bridge) {
-            state.bridge.reportCallError(message);
-        }
-        emptyState.textContent = '摄像头不可用：' + message;
-    }
-
-    function notifyState(callState) {
-        if (state.bridge) {
-            state.bridge.reportCallState(callState);
+    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'probe', 'peer', 'signal', 'ui', 'screen', 'recorder'];
+    var missing = [];
+    for (var i = 0; i < required.length; i++) {
+        if (typeof window.Xiaofu === 'undefined' || !window.Xiaofu[required[i]]) {
+            missing.push(required[i]);
         }
     }
-
-    function createPeerConnection() {
-        if (state.peerConnection) {
-            return state.peerConnection;
-        }
-
-        const peerConnection = new RTCPeerConnection();
-        peerConnection.onicecandidate = function (event) {
-            if (event.candidate && state.bridge) {
-                state.bridge.reportOutgoingSignal({
-                    type: 'ice_candidate',
-                    candidate: event.candidate.candidate,
-                    sdpMid: event.candidate.sdpMid,
-                    sdpMLineIndex: event.candidate.sdpMLineIndex
-                });
-            }
-        };
-        peerConnection.ontrack = function (event) {
-            remoteVideo.srcObject = event.streams[0];
-            emptyState.style.display = 'none';
-        };
-        peerConnection.onconnectionstatechange = function () {
-            notifyState(peerConnection.connectionState);
-        };
-        state.peerConnection = peerConnection;
-        return peerConnection;
+    if (missing.length) {
+        console.error('[Call] MODULE_MISSING ' + missing.join(','));
+        return;
     }
 
-    async function startPreview() {
-        if (state.localStream) {
-            return state.localStream;
-        }
+    var X = window.Xiaofu;
 
-        // 第一阶段只采集视频，避免未实现的音频链路占用麦克风权限。
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 640 },
-                height: { ideal: 480 },
-                frameRate: { ideal: 30, max: 30 }
-            },
-            audio: false
+    function warn(message) {
+        X.log.warn('Call', message);
+    }
+
+    function startPreview() {
+        X.media.startPreview().catch(function (error) {
+            warn('PREVIEW_ERROR ' + error);
         });
-        state.localStream = stream;
-        localVideo.srcObject = stream;
-        emptyState.style.display = 'none';
-
-        const track = stream.getVideoTracks()[0];
-        if (track && state.bridge) {
-            state.bridge.reportPreviewReady(track.getSettings());
-        }
-        return stream;
     }
 
-    async function startOutgoingCall() {
-        try {
-            const stream = await startPreview();
-            const peerConnection = createPeerConnection();
-            stream.getTracks().forEach(function (track) {
-                peerConnection.addTrack(track, stream);
-            });
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            state.bridge.reportOutgoingSignal({ type: 'webrtc_offer', sdp: offer.sdp });
-        } catch (error) {
-            notifyError(error);
-        }
+    function startOutgoingCall() {
+        X.ui.resetLocalPipPosition();
+        X.signal.startOutgoingCall().catch(function (error) {
+            warn('OUTGOING_ERROR ' + error);
+        });
     }
 
-    async function applyRemoteSignal(signal) {
-        try {
-            const peerConnection = createPeerConnection();
-            if (signal.type === 'webrtc_offer') {
-                await peerConnection.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
-                const stream = await startPreview();
-                stream.getTracks().forEach(function (track) {
-                    peerConnection.addTrack(track, stream);
-                });
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                state.bridge.reportOutgoingSignal({ type: 'webrtc_answer', sdp: answer.sdp });
-            } else if (signal.type === 'webrtc_answer') {
-                await peerConnection.setRemoteDescription({ type: 'answer', sdp: signal.sdp });
-            } else if (signal.type === 'ice_candidate') {
-                const candidate = {
-                    candidate: signal.candidate,
-                    sdpMid: signal.sdpMid,
-                    sdpMLineIndex: signal.sdpMLineIndex
-                };
-                if (peerConnection.remoteDescription) {
-                    await peerConnection.addIceCandidate(candidate);
-                } else {
-                    state.pendingCandidates.push(candidate);
-                }
-            }
-
-            while (peerConnection.remoteDescription && state.pendingCandidates.length > 0) {
-                await peerConnection.addIceCandidate(state.pendingCandidates.shift());
-            }
-        } catch (error) {
-            notifyError(error);
-        }
+    function acceptIncomingCall() {
+        X.state.callActive = true;
+        X.ui.resetLocalPipPosition();
+        X.log.call('ACCEPT_INCOMING_R10_1_FOUNDATION_FIX');
+        X.media.startPreview().catch(function (error) {
+            warn('PREVIEW_ERROR ' + error);
+        });
     }
 
-    function setCameraEnabled(enabled) {
-        state.cameraEnabled = enabled;
-        if (state.localStream) {
-            state.localStream.getVideoTracks().forEach(function (track) {
-                track.enabled = enabled;
-            });
-        }
+    function applyRemoteSignal(signal) {
+        X.signal.applyRemoteSignal(signal).catch(function (error) {
+            warn('REMOTE_SIGNAL_ERROR ' + error);
+        });
     }
 
     function stopCall() {
-        if (state.localStream) {
-            state.localStream.getTracks().forEach(function (track) { track.stop(); });
-            state.localStream = null;
+        X.state.callToken++;
+        X.state.callActive = false;
+        X.state.outgoingOfferStarted = false;
+        X.state.previewPromise = null;
+        X.stats.stopStats();
+        X.probe.stopProbe();
+        X.recorder.stop();
+        X.peer.closePc();
+        X.state.pendingCandidates = [];
+        X.media.stopLocalStream();
+        X.screen.stop();
+        X.ui.setScreenShareState(false);
+        X.ui.setRecordingState(false);
+        var remoteVideo = X.dom.remoteVideo;
+        if (remoteVideo) {
+            remoteVideo.onloadedmetadata = null;
+            remoteVideo.onplaying = null;
+            remoteVideo.onresize = null;
+            remoteVideo.onwaiting = null;
+            remoteVideo.onstalled = null;
+            remoteVideo.onerror = null;
+            remoteVideo.srcObject = null;
         }
-        if (state.peerConnection) {
-            state.peerConnection.close();
-            state.peerConnection = null;
-        }
-        state.pendingCandidates = [];
-        localVideo.srcObject = null;
-        remoteVideo.srcObject = null;
-        emptyState.style.display = 'flex';
-        emptyState.textContent = '等待视频通话…';
-        notifyState('closed');
+        X.ui.closeMoreMenu();
+        X.bridge.reportState('closed');
     }
 
-    function makeLocalVideoDraggable() {
-        let offsetX = 0;
-        let offsetY = 0;
-        let dragging = false;
-        localVideo.addEventListener('pointerdown', function (event) {
-            dragging = true;
-            const rect = localVideo.getBoundingClientRect();
-            offsetX = event.clientX - rect.left;
-            offsetY = event.clientY - rect.top;
-            localVideo.setPointerCapture(event.pointerId);
+    function setCameraEnabled(enabled) {
+        X.media.setCameraEnabled(enabled);
+    }
+
+    function setCameraProfile(name) {
+        X.media.setCameraProfile(name).catch(function (error) {
+            warn('CAMERA_PROFILE_ERROR ' + error);
         });
-        localVideo.addEventListener('pointermove', function (event) {
-            if (!dragging) return;
-            const stageRect = document.getElementById('call-stage').getBoundingClientRect();
-            const left = Math.max(12, Math.min(event.clientX - stageRect.left - offsetX,
-                stageRect.width - localVideo.offsetWidth - 12));
-            const top = Math.max(12, Math.min(event.clientY - stageRect.top - offsetY,
-                stageRect.height - localVideo.offsetHeight - 12));
-            localVideo.style.left = left + 'px';
-            localVideo.style.top = top + 'px';
-            localVideo.style.right = 'auto';
+    }
+
+    function setCameraProbeEnabled(enabled) {
+        X.state.cameraProbeEnabled = !!enabled;
+        X.log.call('CAMERA_PROBE_ENABLED=' + X.state.cameraProbeEnabled);
+        if (X.state.cameraProbeEnabled && X.media.getVideoTrack(X.state.localStream)) {
+            X.probe.startProbe();
+        }
+    }
+    function setIceServers(servers) {
+        X.ice.setIceServers(servers);
+    }
+
+    function setIcePolicy() {
+        X.ice.setIcePolicy();
+    }
+
+    function setDiagFilter() {
+        X.ice.setDiagFilter();
+    }
+
+    function setDiagMaxDumps(value) {
+        X.stats.setDiagMaxDumps(value);
+    }
+
+    function screenToggle() {
+        if (!X.screen.isSupported()) {
+            X.log.warn('Call', 'SCREEN_SHARE_UNSUPPORTED_CLICK');
+            if (X.ui.showToast) X.ui.showToast('当前版本暂不支持屏幕共享');
+            return;
+        }
+        if (X.state.screen.active) {
+            X.screen.stop();
+            X.ui.setScreenShareState(false);
+            return;
+        }
+        X.screen.start().catch(function (error) {
+            warn('SCREEN_START_FAIL ' + error);
         });
-        localVideo.addEventListener('pointerup', function () { dragging = false; });
+    }
+
+    function recorderToggle() {
+        if (X.state.recorder.recording) {
+            X.recorder.stop().catch(function (error) {
+                warn('RECORDER_STOP_FAIL ' + error);
+            });
+            return;
+        }
+        X.recorder.start().catch(function (error) {
+            warn('RECORDER_START_FAIL ' + error);
+        });
+    }
+
+    function isFullscreen() {
+        var doc = document;
+        return !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    }
+
+    function fullscreenToggle() {
+        var doc = document;
+        var toggleOn = !isFullscreen();
+        X.log.ui('FULLSCREEN_REQUEST toggleOn=' + toggleOn);
+        if (!toggleOn) {
+            if (doc.exitFullscreen) doc.exitFullscreen();
+            else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+            return;
+        }
+        var target = document.getElementById('call-stage') || document.body;
+        if (target.requestFullscreen) target.requestFullscreen();
+        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        else X.log.warn('Call', 'FULLSCREEN_API_UNAVAILABLE');
+    }
+
+    function onFullscreenChange() {
+        var active = isFullscreen();
+        if (X.ui.setFullscreenState) X.ui.setFullscreenState(active);
+    }
+
+    function bindFeatureButtons() {
+        var micButton = document.getElementById('mic-button');
+        if (micButton) {
+            micButton.addEventListener('click', function () {
+                var active = micButton.getAttribute('data-active') !== 'true';
+                micButton.setAttribute('data-active', active ? 'true' : 'false');
+                X.log.call('MIC_TOGGLE enabled=' + active);
+            });
+        }
+        var camButton = document.getElementById('cam-button');
+        if (camButton) {
+            camButton.addEventListener('click', function () {
+                var unavailable = X.state.localCameraUnavailable === true;
+                var track = X.media.getVideoTrack(X.state.localStream);
+                if (unavailable || !track || track.readyState !== 'live') {
+                    X.log.call('CAM_REACQUIRE_REQUEST');
+                    X.media.startPreview().then(function (stream) {
+                        if (stream) {
+                            X.log.call('CAM_REACQUIRE_OK cameraLabel=' + X.state.cameraDeviceLabel);
+                        } else {
+                            X.log.warn('Call', 'CAM_REACQUIRE_FAIL');
+                        }
+                    });
+                    return;
+                }
+                var active = camButton.getAttribute('data-active') !== 'true';
+                camButton.setAttribute('data-active', active ? 'true' : 'false');
+                X.media.setCameraEnabled(active);
+                X.log.call('CAM_TOGGLE enabled=' + active);
+            });
+        }
+        var hangupButton = document.getElementById('hangup-button');
+        if (hangupButton) {
+            hangupButton.addEventListener('click', function () {
+                X.log.call('HANGUP_REQUEST');
+                if (X.state.bridge && typeof X.state.bridge.requestHangup === 'function') {
+                    X.state.bridge.requestHangup();
+                } else {
+                    stopCall();
+                }
+            });
+        }
+        var shareButton = document.getElementById('share-button');
+        if (shareButton) {
+            shareButton.addEventListener('click', screenToggle);
+        }
+        var recordButton = document.getElementById('record-button');
+        if (recordButton) {
+            recordButton.addEventListener('click', recorderToggle);
+        }
+        var fullscreenButton = document.getElementById('fullscreen-button');
+        if (fullscreenButton) {
+            fullscreenButton.addEventListener('click', function () {
+                fullscreenToggle();
+            });
+        }
+    }
+
+    function diagnose() {
+        X.log.call('MANUAL_DIAG ' + X.peer.pcState(X.state.peerConnection));
+        var track = X.media.getVideoTrack(X.state.localStream);
+        X.media.logVideoTrack('MANUAL_LOCAL_VIDEO', track);
+        var remoteVideo = X.dom.remoteVideo;
+        X.log.call('MANUAL_REMOTE_VIDEO readyState=' + (remoteVideo ? remoteVideo.readyState : 'n/a') + ' videoWidth=' + (remoteVideo ? remoteVideo.videoWidth : 0) + ' videoHeight=' + (remoteVideo ? remoteVideo.videoHeight : 0));
+        X.log.call('MANUAL_PROBE frames=' + X.state.probeFrames + ' errors=' + X.state.probeErrors + ' hash=' + X.state.probeLastHash + ' source=' + X.state.probeLastWidth + 'x' + X.state.probeLastHeight + ' probeActive=' + X.state.probeActive);
+        X.stats.dumpStats('manual');
+    }
+
+    function getDiagState() {
+        var track = X.media.getVideoTrack(X.state.localStream);
+        var settings = X.media.videoTrackSettings(track);
+        var remoteVideo = X.dom.remoteVideo;
+        var screenState = X.screen.getState();
+        var recorderState = X.recorder.getState();
+        return {
+            build: BUILD,
+            video: true,
+            audio: false,
+            icePolicy: 'relay',
+            turnOnly: true,
+            canvasProbe: 'local',
+            cameraProfile: X.media.getCurrentCameraProfile(),
+            cameraGeneration: X.state.cameraGeneration,
+            hasTurn: X.ice.hasTurnServer(),
+            turnServerCount: X.ice.getTurnIceServers().length,
+            pcState: X.peer.pcState(X.state.peerConnection),
+            localVideoTrack: track ? {
+                readyState: track.readyState,
+                enabled: track.enabled,
+                muted: track.muted,
+                width: settings.width || 0,
+                height: settings.height || 0,
+                frameRate: settings.frameRate || 0
+            } : null,
+            remoteVideo: remoteVideo ? {
+                readyState: remoteVideo.readyState,
+                videoWidth: remoteVideo.videoWidth,
+                videoHeight: remoteVideo.videoHeight
+            } : null,
+            canvas: {
+                frames: X.state.probeFrames,
+                errors: X.state.probeErrors,
+                hash: X.state.probeLastHash,
+                width: X.state.probeLastWidth,
+                height: X.state.probeLastHeight,
+                active: X.state.probeActive
+            },
+            screen: screenState,
+            recorder: recorderState,
+            pip: {
+                moved: X.state.ui.pipMoved,
+                x: X.state.ui.pipX,
+                y: X.state.ui.pipY
+            },
+            pendingCandidates: X.state.pendingCandidates.length
+        };
+    }
+
+    function getFeatureState() {
+        var screenState = X.screen.getState();
+        var recorderState = X.recorder.getState();
+        return {
+            build: BUILD,
+            screenShareSupported: screenState.supported,
+            screenShareActive: screenState.active,
+            mediaRecorderSupported: recorderState.supported,
+            mediaRecorderMimeType: recorderState.mimeType,
+            pipDraggable: !!(X.dom.localVideo && X.dom.callStage)
+        };
     }
 
     window.xiaofuWebRtc = {
-        startPreview: function () { startPreview().catch(notifyError); },
+        startPreview: startPreview,
         startOutgoingCall: startOutgoingCall,
+        acceptIncomingCall: acceptIncomingCall,
         applyRemoteSignal: applyRemoteSignal,
-        setCameraEnabled: setCameraEnabled,
         stopCall: stopCall,
-        acceptIncomingCall: function () { startPreview().catch(notifyError); }
+        setCameraEnabled: setCameraEnabled,
+        setCameraProfile: setCameraProfile,
+        setIceServers: setIceServers,
+        setIcePolicy: setIcePolicy,
+        setDiagFilter: setDiagFilter,
+        setCameraProbeEnabled: setCameraProbeEnabled,
+        setDiagMaxDumps: setDiagMaxDumps,
+        screenToggle: screenToggle,
+        recorderToggle: recorderToggle,
+        diagnose: diagnose,
+        getDiagState: getDiagState,
+        getFeatureState: getFeatureState
     };
 
-    makeLocalVideoDraggable();
-    new QWebChannel(qt.webChannelTransport, function (channel) {
-        state.bridge = channel.objects.webRtcBridge;
-        notifyState('ready');
-    });
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    X.media.init();
+    X.ui.init();
+    X.ui.buildCameraProfileBar();
+    X.screen.init();
+    X.recorder.init();
+    if (!X.screen.isSupported() && X.ui.setScreenShareUnsupported) {
+        X.ui.setScreenShareUnsupported(true);
+    }
+    bindFeatureButtons();
+
+    X.log.call('R10_READY build=' + BUILD);
+    X.log.call('DIAG_CONFIG video=true audio=false width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true canvasProbe=local cameraProfile=vga build=' + BUILD);
 }());

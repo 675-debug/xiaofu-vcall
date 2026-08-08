@@ -12,21 +12,21 @@
   </property>
   <property name="minimumSize">
    <size>
-   <width>800</width>
-   <height>600</height>
+    <width>800</width>
+    <height>600</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
-   <width>16777215</width>
-   <height>16777215</height>
+    <width>16777215</width>
+    <height>16777215</height>
    </size>
   </property>
   <property name="windowTitle">
    <string>xiaofu-vcal 客户端</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">#LoginWidget{background:#FFFFFF;font-family:"Microsoft YaHei UI";}
+   <string notr="true">#LoginWidget{background:#FFFFFF;font-family:&quot;Microsoft YaHei UI&quot;;}
 #titleBar{background:#FFFFFF;border-bottom:1px solid #E8E8ED;}
 #titleLabel{font-size:13px;font-weight:600;color:#48484A;}
 #body{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #FAFAFA,stop:1 #F0F0F3);}
@@ -51,7 +51,16 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
    <property name="spacing">
     <number>0</number>
    </property>
-   <property name="margin">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
     <number>0</number>
    </property>
    <item>
@@ -122,9 +131,8 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          <string>最小化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-min.png</normaloff>:/icons/win-min.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -152,9 +160,8 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          <string>最大化</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-max.png</normaloff>:/icons/win-max.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -182,9 +189,8 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          <string>关闭</string>
         </property>
         <property name="icon">
-         <iconset resource="resources.qrc">
-          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png
-         </iconset>
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/win-close.png</normaloff>:/icons/win-close.png</iconset>
         </property>
         <property name="iconSize">
          <size>
@@ -249,7 +255,16 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          <property name="spacing">
           <number>0</number>
          </property>
-         <property name="margin">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
           <number>0</number>
          </property>
          <item alignment="Qt::AlignHCenter">
@@ -278,9 +293,6 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
             <property name="frameShape">
              <enum>QFrame::NoFrame</enum>
             </property>
-            <attribute name="WA_TransparentForMouseEvents">
-             <bool>true</bool>
-            </attribute>
            </widget>
            <widget class="QLabel" name="logo">
             <property name="geometry">
@@ -291,15 +303,12 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
               <height>56</height>
              </rect>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
             <property name="text">
              <string>V</string>
             </property>
-            <attribute name="WA_TransparentForMouseEvents">
-             <bool>true</bool>
-            </attribute>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
            </widget>
           </widget>
          </item>
@@ -321,11 +330,11 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          </item>
          <item>
           <widget class="QLabel" name="title">
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
            <property name="text">
             <string>欢迎回来</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -347,11 +356,11 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          </item>
          <item>
           <widget class="QLabel" name="sub">
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
            <property name="text">
             <string>登录你的 xiaofu-vcal 账号</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -408,11 +417,8 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
              </rect>
             </property>
             <property name="pixmap">
-             <pixmap resource="resources.qrc">:/icons/icon-user.png</pixmap>
+             <pixmap resource="../resources.qrc">:/icons/icon-user.png</pixmap>
             </property>
-            <attribute name="WA_TransparentForMouseEvents">
-             <bool>true</bool>
-            </attribute>
            </widget>
           </widget>
          </item>
@@ -472,11 +478,8 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
              </rect>
             </property>
             <property name="pixmap">
-             <pixmap resource="resources.qrc">:/icons/icon-lock.png</pixmap>
+             <pixmap resource="../resources.qrc">:/icons/icon-lock.png</pixmap>
             </property>
-            <attribute name="WA_TransparentForMouseEvents">
-             <bool>true</bool>
-            </attribute>
            </widget>
           </widget>
          </item>
@@ -592,14 +595,14 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
          </item>
          <item>
           <widget class="QLabel" name="hint">
+           <property name="text">
+            <string>安全提示：请勿向他人泄露账号和密码</string>
+           </property>
            <property name="alignment">
             <set>Qt::AlignCenter</set>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>安全提示：请勿向他人泄露账号和密码</string>
            </property>
           </widget>
          </item>
@@ -625,7 +628,7 @@ QPushButton#btnForgot:hover,QPushButton#btnRegister:hover{color:#0062CC;}
   </layout>
  </widget>
  <resources>
-  <include location="resources.qrc"/>
+  <include location="../resources.qrc"/>
  </resources>
  <connections/>
 </ui>
