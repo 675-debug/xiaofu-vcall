@@ -390,7 +390,7 @@ D:\app\Qt5.12.12\msvc2017_64\bin\windeployqt.exe --debug --webengine .\debug\xia
 服务端：
 
 ```bash
-cd /root/workspace/server/build-linux-epoll
+cd /root/workspace/server/xiaofu_server/build-linux-epoll
 
 ./xiaofu-server \
   --host 0.0.0.0 \
@@ -465,9 +465,9 @@ client/src/video/VideoCallController.cpp
 client/resources/video/video_call.html
 client/src/network/NetworkManager.h
 client/src/network/NetworkManager.cpp
-server/src/ServerApp.cpp
-server/src/net/EpollLoop.cpp
-server/src/net/Connection.cpp
+xiaofu_server/src/ServerApp.cpp
+xiaofu_server/src/net/EpollLoop.cpp
+xiaofu_server/src/net/Connection.cpp
 ```
 
 接手时不要大改架构，先做小步验证：

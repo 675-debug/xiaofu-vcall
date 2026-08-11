@@ -54,6 +54,7 @@ void LoginWidget::on_btnLogin_clicked() {
         return;
     }
     qDebug() << "Login attempt" << (loginAttempts + 1) << "of" << kMaxLoginAttempts << "for user" << username;
+    alreadyLoggedInDialogShown = false;
     networkManager->sendLogin(username, password);
 }
 
@@ -63,6 +64,16 @@ void LoginWidget::onLoginResult(int code, const QString& message, const QString&
         loginAttempts = 0;
         qDebug() << "Login success for user" << username;
         emit loginSucceeded(username);
+    } else if (code == kAccountAlreadyLoggedInCode) {
+        if (alreadyLoggedInDialogShown)
+            return;
+        alreadyLoggedInDialogShown = true;
+        qDebug() << "Login rejected: account already logged in elsewhere for user" << username;
+        ui->btnLogin->setEnabled(true);
+        // 模态提示框只提供"确定"按钮；用户点击确定后才清空表单并回到账号框。
+        // 保持登录页，不进入主界面，不创建会话，不自动重试，不退出程序。
+        QMessageBox::information(this, "提示", "该账户在异地登录。");
+        resetLoginForm();
     } else {
         loginAttempts++;
         int remaining = kMaxLoginAttempts - loginAttempts;
@@ -82,6 +93,13 @@ void LoginWidget::onLoginResult(int code, const QString& message, const QString&
             QMessageBox::warning(this, "登录失败", QString("账户或密码错误，当前还有 %1 次机会").arg(remaining));
         }
     }
+}
+
+void LoginWidget::resetLoginForm() {
+    ui->btnLogin->setEnabled(true);
+    ui->editUser->clear();
+    ui->editPass->clear();
+    ui->editUser->setFocus();
 }
 
 void LoginWidget::on_btnRegister_clicked() {

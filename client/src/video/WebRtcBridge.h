@@ -34,6 +34,10 @@ public:
     void applyCameraProbeEnabled();
     // 页面加载完成后把 C++ 侧暂存的诊断过滤模式推送给 JS。
     void applyDiagFilter();
+    // 实时字幕 FunASR WebSocket 服务地址，页面加载完成后注入 JS。
+    void setSubtitleUrl(const QString& url);
+    // 页面加载完成后把 C++ 侧暂存的字幕服务地址推送给 JS。
+    void applySubtitleUrl();
     // R10：屏幕共享/录制的 UI foundation 开关，仅驱动 JS 能力探测与基础状态，不真正采集/保存。
     void toggleScreenShare();
     void toggleRecording();
@@ -59,6 +63,7 @@ private:
     QVariantList pendingIceServers;
     QString pendingIcePolicy;
     QString pendingDiagFilter;
+    QString pendingSubtitleUrl;
     bool pendingCameraProbeEnabled = false;
 };
 

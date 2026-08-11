@@ -119,6 +119,22 @@ void WebRtcBridge::applyDiagFilter() {
     setDiagFilter(pendingDiagFilter);
 }
 
+void WebRtcBridge::setSubtitleUrl(const QString& url) {
+    pendingSubtitleUrl = url;
+    qDebug().noquote() << "[Call] subtitle asr url:" << url;
+    if (!page)
+        return;
+    const QString urlJson = QStringLiteral("\"%1\"").arg(url);
+    runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.setSubtitleUrl(%1);")
+                      .arg(urlJson));
+}
+
+void WebRtcBridge::applySubtitleUrl() {
+    if (pendingSubtitleUrl.isEmpty())
+        return;
+    setSubtitleUrl(pendingSubtitleUrl);
+}
+
 
 void WebRtcBridge::setCameraProbeEnabled(bool enabled) {
     pendingCameraProbeEnabled = enabled;

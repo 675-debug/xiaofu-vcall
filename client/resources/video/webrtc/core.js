@@ -1,7 +1,7 @@
 ﻿(function (X) {
     'use strict';
 
-    var BUILD = '2026-08-08-r10.2.4-ui-recorder-fullscreen-fix';
+    var BUILD = '2026-08-08-r11-call-reliability-ux';
 
     X.core = {
         build: BUILD

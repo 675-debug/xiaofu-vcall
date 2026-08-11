@@ -1,9 +1,9 @@
-﻿(function () {
+(function () {
     'use strict';
 
-    var BUILD = '2026-08-08-r10.2.4-ui-recorder-fullscreen-fix';
+    var BUILD = '2026-08-08-r11-call-reliability-ux';
 
-    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'probe', 'peer', 'signal', 'ui', 'screen', 'recorder'];
+    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'probe', 'peer', 'signal', 'ui', 'screen', 'recorder', 'subtitle'];
     var missing = [];
     for (var i = 0; i < required.length; i++) {
         if (typeof window.Xiaofu === 'undefined' || !window.Xiaofu[required[i]]) {
@@ -57,10 +57,13 @@
         X.stats.stopStats();
         X.probe.stopProbe();
         X.recorder.stop();
+        X.subtitle.stop();
+        X.ui.setSubtitleState(false);
         X.peer.closePc();
         X.state.pendingCandidates = [];
-        X.media.stopLocalStream();
         X.screen.stop();
+        X.media.stopLocalStream();
+        X.media.stopLocalAudio('stop-call');
         X.ui.setScreenShareState(false);
         X.ui.setRecordingState(false);
         var remoteVideo = X.dom.remoteVideo;
@@ -74,11 +77,16 @@
             remoteVideo.srcObject = null;
         }
         X.ui.closeMoreMenu();
+        if (X.ui && X.ui.stopCallTimer) X.ui.stopCallTimer();
         X.bridge.reportState('closed');
     }
 
     function setCameraEnabled(enabled) {
         X.media.setCameraEnabled(enabled);
+    }
+
+    function setMicEnabled(enabled) {
+        X.media.setMicEnabled(enabled);
     }
 
     function setCameraProfile(name) {
@@ -161,13 +169,34 @@
     function onFullscreenChange() {
         var active = isFullscreen();
         if (X.ui.setFullscreenState) X.ui.setFullscreenState(active);
+        if (X.ui.repositionMoreMenu) {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    X.ui.repositionMoreMenu();
+                });
+            });
+        }
     }
 
     function bindFeatureButtons() {
         var micButton = document.getElementById('mic-button');
         if (micButton) {
             micButton.addEventListener('click', function () {
+                var audioTrack = X.media.getAudioTrack ? X.media.getAudioTrack(X.state.localAudioStream) : null;
+                if (!audioTrack || audioTrack.readyState !== 'live') {
+                    X.log.call('MIC_REACQUIRE_REQUEST');
+                    X.media.startAudio().then(function (stream) {
+                        if (stream) {
+                            X.log.call('MIC_REACQUIRE_OK');
+                            micButton.setAttribute('data-active', 'true');
+                        } else {
+                            X.log.warn('Call', 'MIC_REACQUIRE_FAIL');
+                        }
+                    });
+                    return;
+                }
                 var active = micButton.getAttribute('data-active') !== 'true';
+                X.media.setMicEnabled(active);
                 micButton.setAttribute('data-active', active ? 'true' : 'false');
                 X.log.call('MIC_TOGGLE enabled=' + active);
             });
@@ -219,6 +248,14 @@
                 fullscreenToggle();
             });
         }
+        var subtitleButton = document.getElementById('subtitle-button');
+        if (subtitleButton) {
+            subtitleButton.addEventListener('click', function () {
+                X.subtitle.toggle();
+                X.ui.setSubtitleState(X.subtitle.isEnabled());
+                X.log.call('SUBTITLE_TOGGLE enabled=' + X.subtitle.isEnabled());
+            });
+        }
     }
 
     function diagnose() {
@@ -240,7 +277,7 @@
         return {
             build: BUILD,
             video: true,
-            audio: false,
+            audio: true,
             icePolicy: 'relay',
             turnOnly: true,
             canvasProbe: 'local',
@@ -281,6 +318,13 @@
         };
     }
 
+    // 实时字幕：C++ 桥在页面加载后注入 FunASR WebSocket 服务地址（默认已指向云服务器）。
+    function setSubtitleUrl(url) {
+        if (X.subtitle && X.subtitle.setUrl) {
+            X.subtitle.setUrl(url);
+        }
+    }
+
     function getFeatureState() {
         var screenState = X.screen.getState();
         var recorderState = X.recorder.getState();
@@ -302,11 +346,13 @@
         stopCall: stopCall,
         setCameraEnabled: setCameraEnabled,
         setCameraProfile: setCameraProfile,
+        setMicEnabled: setMicEnabled,
         setIceServers: setIceServers,
         setIcePolicy: setIcePolicy,
         setDiagFilter: setDiagFilter,
         setCameraProbeEnabled: setCameraProbeEnabled,
         setDiagMaxDumps: setDiagMaxDumps,
+        setSubtitleUrl: setSubtitleUrl,
         screenToggle: screenToggle,
         recorderToggle: recorderToggle,
         diagnose: diagnose,
@@ -326,6 +372,6 @@
     }
     bindFeatureButtons();
 
-    X.log.call('R10_READY build=' + BUILD);
-    X.log.call('DIAG_CONFIG video=true audio=false width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true canvasProbe=local cameraProfile=vga build=' + BUILD);
+    X.log.call('R11_READY build=' + BUILD);
+    X.log.call('DIAG_CONFIG video=true audio=true width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true canvasProbe=local cameraProfile=vga build=' + BUILD);
 }());

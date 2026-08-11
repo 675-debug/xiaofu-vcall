@@ -26,6 +26,7 @@
         <file alias="webrtc/ice.js">resources/video/webrtc/ice.js</file>
         <file alias="webrtc/stats.js">resources/video/webrtc/stats.js</file>
         <file alias="webrtc/probe.js">resources/video/webrtc/probe.js</file>
+        <file alias="webrtc/subtitle.js">resources/video/webrtc/subtitle.js</file>
         <file alias="webrtc/peer.js">resources/video/webrtc/peer.js</file>
         <file alias="webrtc/ui.js">resources/video/webrtc/ui.js</file>
         <file alias="webrtc/screen.js">resources/video/webrtc/screen.js</file>

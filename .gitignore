@@ -64,3 +64,19 @@ client/start_video_call.sh
 
 # Local backup files
 *.bak*
+
+# FunASR 推理服务（腾讯云）：模型/日志/venv 不入库，保留目录占位
+server/FunASR_Server/model/*
+!server/FunASR_Server/model/.gitkeep
+server/FunASR_Server/logs/*
+!server/FunASR_Server/logs/.gitkeep
+server/FunASR_Server/venv/
+# SQLite 运行数据库（xiaofu_server 运行时生成，不入库）
+server/xiaofu_server/data/
+
+# Python 字节码缓存
+__pycache__/
+
+# SQLite WAL 运行文件（全局兜底）
+*.db-wal
+*.db-shm

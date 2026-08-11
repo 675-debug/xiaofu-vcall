@@ -1,7 +1,15 @@
-QT += core gui widgets network multimedia webenginewidgets webchannel
+greaterThan(QT_MAJOR_VERSION, 5) {
+    QT += core gui widgets network webenginewidgets webchannel
+} else {
+    QT += core gui widgets network multimedia webenginewidgets webchannel
+}
 TARGET = xiaofu-vcall-client
 TEMPLATE = app
-CONFIG += c++11
+greaterThan(QT_MAJOR_VERSION, 5) {
+    CONFIG += c++17
+} else {
+    CONFIG += c++11
+}
 CONFIG -= debug_and_release
 DESTDIR = $$PWD/debug
 INCLUDEPATH += src

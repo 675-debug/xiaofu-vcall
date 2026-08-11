@@ -25,6 +25,7 @@ private:
     void installTitleBarDragging();
     void showAuthPage(int index);
     void showWorkspacePage(int index);
+    void resetToLoginPage();
 
     static const QSize kAuthWindowSize;
     static const QSize kWorkspaceWindowSize;

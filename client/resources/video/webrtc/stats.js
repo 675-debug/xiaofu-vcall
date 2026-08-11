@@ -18,6 +18,19 @@
         return codec.mimeType || codec.name || codec.codec || 'n/a';
     }
 
+    function networkQuality(rttMs, lost, total) {
+        var rtt = rttMs === null || rttMs === undefined ? -1 : rttMs;
+        var lossRate = total > 0 ? (lost / total) : 0;
+        if (rtt >= 0 && rtt < 200 && lossRate < 0.02) return 'good';
+        if (rtt >= 0 && rtt < 500 && lossRate < 0.08) return 'fair';
+        return 'poor';
+    }
+
+    function qualityText(quality) {
+        if (quality === 'good') return '良好';
+        if (quality === 'fair') return '一般';
+        return '较差';
+    }
     function dumpStats(reason) {
         var pc = X.state.peerConnection;
         if (!pc || typeof pc.getStats !== 'function') return;
@@ -26,6 +39,8 @@
             var pairs = {};
             var codecs = {};
             var selectedPairId = '';
+            var videoLost = 0;
+            var videoReceived = 0;
             eachReport(reports, function (report) {
                 if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
                     candidates[report.id] = report;
@@ -38,6 +53,10 @@
                 }
                 if (report.type === 'transport' && report.selectedCandidatePairId) {
                     selectedPairId = report.selectedCandidatePairId;
+                }
+                if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video')) {
+                    videoLost += report.packetsLost || 0;
+                    videoReceived += report.packetsReceived || 0;
                 }
             });
             eachReport(reports, function (report) {
@@ -63,6 +82,9 @@
             if (selectedPairId && pairs[selectedPairId]) {
                 var selected = pairs[selectedPairId];
                 X.log.stats('STATS_SELECTED_PAIR reason=' + reason + ' local=' + statsCandidateDescription(candidates[selected.localCandidateId]) + ' remote=' + statsCandidateDescription(candidates[selected.remoteCandidateId]));
+                var rtt = selected.currentRoundTripTime !== undefined ? Math.round(selected.currentRoundTripTime * 1000) : -1;
+                var quality = networkQuality(rtt, videoLost, videoReceived);
+                X.log.stats('NETWORK_QUALITY reason=' + reason + ' rtt=' + (rtt >= 0 ? rtt + 'ms' : 'n/a') + ' lost=' + videoLost + ' received=' + videoReceived + ' quality=' + qualityText(quality));
             }
             X.log.stats('PROBE_STATS reason=' + reason + ' frames=' + X.state.probeFrames + ' errors=' + X.state.probeErrors + ' hash=' + X.state.probeLastHash + ' source=' + X.state.probeLastWidth + 'x' + X.state.probeLastHeight + ' probeActive=' + X.state.probeActive);
         }).catch(function (error) {

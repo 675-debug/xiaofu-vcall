@@ -10,8 +10,12 @@ NetworkManager::NetworkManager(QObject* parent)
     connect(tcpSocket, &QTcpSocket::connected, this, &NetworkManager::onConnected);
     connect(tcpSocket, &QTcpSocket::disconnected, this, &NetworkManager::onDisconnected);
     // Qt 5.12: QOverload required for overloaded signal
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    connect(tcpSocket, &QTcpSocket::errorOccurred, this, &NetworkManager::onError);
+#else
     connect(tcpSocket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
             this, &NetworkManager::onError);
+#endif
     heartbeatTimer->setInterval(15000);
     connect(heartbeatTimer, &QTimer::timeout, this, &NetworkManager::sendHeartbeat);
 }
@@ -266,7 +270,9 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
     } else if (type == "call_signal_resp") {
         emit callSignalSendResult(response.value("signalType").toString(), code, message);
     } else if (type == "call_request" || type == "call_accept" || type == "call_reject"
-               || type == "call_hangup" || type == "webrtc_offer" || type == "webrtc_answer"
+               || type == "call_hangup" || type == "call_cancel"
+               || type == "peer_disconnected" || type == "call_ended"
+               || type == "webrtc_offer" || type == "webrtc_answer"
                || type == "ice_candidate") {
         qDebug() << "[Network] call signal received:" << type
                  << "from=" << response.value("from").toString();

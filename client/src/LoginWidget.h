@@ -14,6 +14,7 @@ public:
     ~LoginWidget();
 
     void setNetworkManager(NetworkManager* manager);
+    void resetLoginForm();
 
 signals:
     void switchToRegister();
@@ -34,7 +35,9 @@ private slots:
 
 private:
     static const int kMaxLoginAttempts = 6;
+    static const int kAccountAlreadyLoggedInCode = 15; // 对应 Server ResultCode::DuplicateLogin
     int loginAttempts = 0;
+    bool alreadyLoggedInDialogShown = false;
 
     Ui::LoginWidget* ui;
     NetworkManager*  networkManager = nullptr;

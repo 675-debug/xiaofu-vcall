@@ -212,6 +212,16 @@
         X.log.ui(active ? 'FULLSCREEN_ENTER' : 'FULLSCREEN_EXIT');
     }
 
+    function setSubtitleState(active) {
+        var button = findButton('#subtitle-button');
+        if (button) {
+            button.setAttribute('data-active', active ? 'true' : 'false');
+            button.textContent = active ? '关闭字幕' : '实时字幕';
+        }
+        X.log.ui('SUBTITLE_STATE active=' + !!active);
+    }
+
+
     function morePopover() {
         return document.getElementById('more-popover');
     }
@@ -222,13 +232,14 @@
         if (!button || !popover) return;
         var rect = button.getBoundingClientRect();
         var width = popover.offsetWidth || 128;
-        var height = popover.offsetHeight || 68;
-        var left = rect.left + rect.width / 2 - width / 2;
-        left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
-        var top = rect.top - height - 8;
-        if (top < 8) top = 8;
-        popover.style.left = left + 'px';
-        popover.style.top = top + 'px';
+        var baseLeft = rect.left + rect.width / 2 - width / 2;
+        var clampedLeft = Math.max(8, Math.min(baseLeft, window.innerWidth - width - 8));
+        var shift = clampedLeft - baseLeft;
+        popover.style.transform = 'translateX(calc(-50% + ' + shift + 'px))';
+    }
+
+    function repositionMoreMenu() {
+        if (isMoreMenuOpen()) positionMorePopover();
     }
 
     function isMoreMenuOpen() {
@@ -394,7 +405,10 @@
             moreButton.addEventListener('click', toggleMoreMenu);
         }
         document.addEventListener('click', onDocumentClick);
-        window.addEventListener('resize', reClamp);
+        window.addEventListener('resize', function () {
+            reClamp();
+            repositionMoreMenu();
+        });
         X.log.ui('INIT');
     }
 
@@ -474,6 +488,44 @@
         if (!pending) refreshCameraProfileActive();
         X.log.ui('CAMERA_PROFILE_PENDING profile=' + profileName + ' pending=' + (pending ? 'true' : 'false'));
     }
+
+    var callTimerInterval = 0;
+    var callTimerSeconds = 0;
+
+    function updateCallTimer() {
+        callTimerSeconds++;
+        var el = document.getElementById('call-timer');
+        if (!el) return;
+        var m = Math.floor(callTimerSeconds / 60);
+        var s = callTimerSeconds % 60;
+        el.textContent = (m < 10 ? '0' + m : '' + m) + ':' + (s < 10 ? '0' + s : '' + s);
+    }
+
+    function startCallTimer() {
+        if (callTimerInterval) return;
+        callTimerSeconds = 0;
+        var el = document.getElementById('call-timer');
+        if (el) {
+            el.textContent = '00:00';
+            el.style.display = 'block';
+        }
+        callTimerInterval = setInterval(updateCallTimer, 1000);
+        X.log.ui('CALL_TIMER_START');
+    }
+
+    function stopCallTimer() {
+        if (callTimerInterval) {
+            clearInterval(callTimerInterval);
+            callTimerInterval = 0;
+        }
+        callTimerSeconds = 0;
+        var el = document.getElementById('call-timer');
+        if (el) {
+            el.textContent = '00:00';
+            el.style.display = 'none';
+        }
+        X.log.ui('CALL_TIMER_STOP');
+    }
     X.ui = {
         init: init,
         initLocalPipDrag: bindDrag,
@@ -489,9 +541,14 @@
         setCameraProfilePending: setCameraProfilePending,
         setFullscreenState: setFullscreenState,
         showToast: showToast,
-        setScreenShareUnsupported: setScreenShareUnsupported
+        setScreenShareUnsupported: setScreenShareUnsupported,
+        repositionMoreMenu: repositionMoreMenu,
+        startCallTimer: startCallTimer,
+        stopCallTimer: stopCallTimer,
+        setSubtitleState: setSubtitleState
     };
 
     X.log.ui('loaded');
 }(window.Xiaofu = window.Xiaofu || {}));
+
 

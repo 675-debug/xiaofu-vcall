@@ -31,14 +31,16 @@ xiaofu-vcall/
 │   ├── ui/                         # Qt Designer UI 文件
 │   ├── resources/video/            # 视频通话 HTML + WebRTC 模块 JS
 │   └── xiaofu-vcall-client.pro
-├── server/                         # C++ 服务端
-│   ├── src/net/                    # SocketPlatform、Connection、TcpServer、EpollLoop
-│   ├── src/concurrency/            # ThreadPool、CompletionDispatcher
-│   ├── src/handler/                # 注册、登录、聊天、联系人、信令处理
-│   ├── src/db/                     # SQLite、用户、好友、聊天记录、密码哈希
-│   ├── src/process/                # daemon 支持
-│   ├── deploy/                     # Ubuntu/systemd 部署文件
-│   └── CMakeLists.txt
+├── server/
+│   ├── xiaofu_server/              # 阿里云部署：C++ 业务通信服务
+│   │   ├── src/net/                # SocketPlatform、Connection、TcpServer、EpollLoop
+│   │   ├── src/concurrency/        # ThreadPool、CompletionDispatcher
+│   │   ├── src/handler/            # 注册、登录、聊天、联系人、信令处理
+│   │   ├── src/db/                 # SQLite、用户、好友、聊天记录、密码哈希
+│   │   ├── src/process/            # daemon 支持
+│   │   ├── deploy/                 # Ubuntu/systemd 部署文件
+│   │   └── CMakeLists.txt
+│   └── FunASR_Server/              # 腾讯云部署：FunASR 推理服务（骨架）
 ├── tools/                          # 集成测试与辅助脚本
 └── README.md
 ```
@@ -78,7 +80,7 @@ SQLite
 sudo apt update
 sudo apt install -y build-essential cmake pkg-config sqlite3 libsqlite3-dev libssl-dev
 
-cd server
+cd server/xiaofu_server
 mkdir -p build-linux-epoll && cd build-linux-epoll
 cmake ..
 cmake --build . -j"$(nproc)"

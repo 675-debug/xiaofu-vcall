@@ -24,6 +24,11 @@
         return tracks.length ? tracks[0] : null;
     }
 
+    function getAudioTrack(stream) {
+        if (!stream) return null;
+        var tracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+        return tracks.length ? tracks[0] : null;
+    }
     function videoTrackSettings(track) {
         if (!track) return {};
         if (typeof track.getSettings === 'function') {
@@ -704,6 +709,9 @@
         }
         X.state.previewPromise = acquireInitial(X.state.currentCameraProfile).then(function (stream) {
             X.state.previewPromise = null;
+            startAudio().catch(function (error) {
+                X.log.warn('Media', 'AUDIO_START_FAIL ' + error);
+            });
             return stream;
         });
         return X.state.previewPromise;
@@ -750,6 +758,121 @@
 
     function getCameraLabel() {
         return X.state.cameraDeviceLabel;
+    }
+
+    function refreshAudioDeviceList() {
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') return;
+        navigator.mediaDevices.enumerateDevices().then(function (devices) {
+            var list = [];
+            for (var i = 0; i < devices.length; i++) {
+                var device = devices[i];
+                if (device.kind === 'audioinput') {
+                    list.push({ deviceId: device.deviceId || '', label: device.label || '' });
+                }
+            }
+            X.state.audioDeviceList = list;
+            X.log.media('AUDIO_DEVICE_LIST count=' + list.length);
+        }).catch(function (error) {
+            X.log.warn('Media', 'AUDIO_ENUMERATE_FAIL ' + error);
+        });
+    }
+
+    function startAudio() {
+        if (X.state.localAudioStream) {
+            var existing = getAudioTrack(X.state.localAudioStream);
+            if (existing && existing.readyState === 'live') {
+                var sender = X.peer.getAudioSender ? X.peer.getAudioSender() : null;
+                if (sender && sender.track !== existing && X.peer.replaceAudioTrack) {
+                    return X.peer.replaceAudioTrack(existing).then(function () {
+                        return X.state.localAudioStream;
+                    });
+                }
+                return Promise.resolve(X.state.localAudioStream);
+            }
+            stopLocalAudio('stale-cleanup');
+        }
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            X.log.warn('Media', 'AUDIO_UNSUPPORTED');
+            return Promise.resolve(null);
+        }
+        X.log.media('AUDIO_REQUEST');
+        return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+            var track = getAudioTrack(stream);
+            if (!track) {
+                stopTracks(stream);
+                X.log.warn('Media', 'AUDIO_NO_TRACK');
+                return null;
+            }
+            X.state.localAudioStream = stream;
+            X.state.micEnabled = track.enabled !== false;
+            X.log.media('AUDIO_GRANTED enabled=' + X.state.micEnabled);
+            refreshAudioDeviceList();
+            var audioSender = X.peer.getAudioSender ? X.peer.getAudioSender() : null;
+            if (audioSender && X.peer.replaceAudioTrack) {
+                return X.peer.replaceAudioTrack(track).then(function () {
+                    return stream;
+                });
+            }
+            return stream;
+        }).catch(function (error) {
+            X.log.warn('Media', 'AUDIO_START_FAIL ' + error);
+            return null;
+        });
+    }
+
+    function setMicEnabled(enabled) {
+        var track = getAudioTrack(X.state.localAudioStream);
+        if (!track) {
+            X.log.warn('Media', 'MIC_TOGGLE_NO_TRACK enabled=' + !!enabled);
+            return;
+        }
+        X.state.micEnabled = !!enabled;
+        track.enabled = X.state.micEnabled;
+        X.log.media('MIC_ENABLED=' + X.state.micEnabled + ' readyState=' + track.readyState);
+    }
+
+    function switchMicDevice(deviceId) {
+        if (!deviceId) return Promise.reject(new Error('no audio device id'));
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            return Promise.reject(new Error('getUserMedia unavailable'));
+        }
+        X.log.media('MIC_SWITCH_BEGIN deviceId=<set>');
+        var oldStream = X.state.localAudioStream;
+        return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } }).then(function (stream) {
+            var track = getAudioTrack(stream);
+            if (!track) {
+                stopTracks(stream);
+                throw new Error('no audio track');
+            }
+            var audioSender = X.peer.getAudioSender ? X.peer.getAudioSender() : null;
+            if (!audioSender || !X.peer.replaceAudioTrack) {
+                stopTracks(stream);
+                throw new Error('no audio sender');
+            }
+            return X.peer.replaceAudioTrack(track).then(function () {
+                X.state.localAudioStream = stream;
+                if (oldStream && oldStream !== stream) stopTracks(oldStream);
+                X.state.micEnabled = track.enabled !== false;
+                refreshAudioDeviceList();
+                X.log.media('MIC_SWITCH_OK enabled=' + X.state.micEnabled);
+                return stream;
+            }).catch(function (error) {
+                stopTracks(stream);
+                throw error;
+            });
+        }).catch(function (error) {
+            X.log.warn('Media', 'MIC_SWITCH_FAIL ' + error);
+            throw error;
+        });
+    }
+
+    function stopLocalAudio(action) {
+        var stream = X.state.localAudioStream;
+        if (!stream) return;
+        var track = getAudioTrack(stream);
+        X.log.media('LOCAL_AUDIO_STOPPED action=' + (action || 'stop-call') + ' readyState=' + (track ? track.readyState : 'n/a'));
+        stopTracks(stream);
+        X.state.localAudioStream = null;
     }
 
     function stopLocalStream(action) {
@@ -801,8 +924,13 @@
         getProfileInfo: getProfileInfo,
         getCameraLabel: getCameraLabel,
         stopLocalStream: stopLocalStream,
+        stopLocalAudio: stopLocalAudio,
         setCameraEnabled: setCameraEnabled,
         getVideoTrack: getVideoTrack,
+        getAudioTrack: getAudioTrack,
+        startAudio: startAudio,
+        setMicEnabled: setMicEnabled,
+        switchMicDevice: switchMicDevice,
         videoTrackSettings: videoTrackSettings,
         logVideoTrack: logVideoTrack,
         attachLocalPreview: attachLocalPreview,

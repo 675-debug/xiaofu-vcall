@@ -10,6 +10,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QMessageBox>
 #include <QtGlobal>
 
 const QSize MainWindow::kAuthWindowSize = QSize(900, 930);
@@ -63,6 +64,13 @@ void MainWindow::showWorkspacePage(int index) {
     resize(kWorkspaceWindowSize);
 }
 
+void MainWindow::resetToLoginPage() {
+    networkManager->logout();
+    ui->mainPage->resetSession();
+    ui->loginPage->resetLoginForm();
+    showAuthPage(1);
+}
+
 void MainWindow::setupConnections() {
     connect(ui->loginPage, &LoginWidget::switchToRegister, this, [this]() {
         showAuthPage(2);
@@ -86,9 +94,7 @@ void MainWindow::setupConnections() {
         showWorkspacePage(5);
     });
     connect(ui->mainPage, &MainWidget::logoutRequested, this, [this]() {
-        networkManager->logout();
-        ui->mainPage->resetSession();
-        showAuthPage(1);
+        resetToLoginPage();
     });
 
     // 发消息界面 → 返回主界面 / 发起通话
@@ -106,6 +112,16 @@ void MainWindow::setupConnections() {
     });
     connect(ui->callPage, &CallWidget::incomingCallRequested, this, [this]() {
         showWorkspacePage(5);
+    });
+
+    // 重复登录/被踢下线：join 被拒时回到登录页并提示，不能静默覆盖当前会话。
+    connect(networkManager, &NetworkManager::joinResult, this, [this](int code, const QString& message) {
+        if (code == 0)
+            return;
+        qDebug().noquote() << "[MainWindow] join rejected:" << message;
+        resetToLoginPage();
+        QMessageBox::warning(this, QStringLiteral("提示"),
+                             QStringLiteral("账号已在其他设备登录或已被踢下线，请重新登录"));
     });
 
     // 登录成功 → 主界面
