@@ -1,203 +1,306 @@
 #include "DbManager.h"
 #include "../util/Log.h"
 
-DbManager::DbManager() : db(nullptr) {}
-DbManager::~DbManager() { close(); }
+#include <cstdlib>
+#include <cstring>
 
-bool DbManager::open(const std::string& dbPath) {
-    const int resultCode = sqlite3_open(dbPath.c_str(), &db);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("open db failed: ") + (db ? sqlite3_errmsg(db) : "unknown"));
-        close();
+namespace {
+
+const char* envValue(const char* name, const char* fallback) {
+    const char* value = std::getenv(name);
+    return (value && value[0] != '\0') ? value : fallback;
+}
+
+MYSQL_STMT* prepareStatement(MYSQL* mysql, const char* sql) {
+    MYSQL_STMT* statement = mysql_stmt_init(mysql);
+    if (!statement) {
+        Log::error("mysql_stmt_init failed");
+        return nullptr;
+    }
+    if (mysql_stmt_prepare(statement, sql,
+                           static_cast<unsigned long>(std::strlen(sql))) != 0) {
+        Log::error(std::string("mysql_stmt_prepare failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return nullptr;
+    }
+    return statement;
+}
+
+bool executeBound(MYSQL_STMT* statement, MYSQL_BIND* params, unsigned long paramCount) {
+    if (paramCount > 0 && mysql_stmt_bind_param(statement, params) != 0) {
+        Log::error(std::string("mysql_stmt_bind_param failed: ") + mysql_stmt_error(statement));
         return false;
     }
-    // 必须先设置忙等待，再让多个 worker 同时协商 WAL，避免第二个连接立即返回 SQLITE_BUSY。
-    sqlite3_busy_timeout(db, 3000);
-    const char* workerPragmas =
-        "PRAGMA busy_timeout=3000;"
-        "PRAGMA journal_mode=WAL;"
-        "PRAGMA synchronous=NORMAL;"
-        "PRAGMA foreign_keys=ON;";
-    char* errorMessage = nullptr;
-    if (sqlite3_exec(db, workerPragmas, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
-        Log::error(std::string("configure db failed: ")
-                   + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        close();
+    if (mysql_stmt_execute(statement) != 0) {
+        Log::error(std::string("mysql_stmt_execute failed: ") + mysql_stmt_error(statement));
         return false;
     }
     return true;
 }
 
+void bindStringParam(MYSQL_BIND& bind, const std::string& value) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_STRING;
+    bind.buffer = const_cast<char*>(value.c_str());
+    bind.buffer_length = static_cast<unsigned long>(value.size());
+}
+
+void bindIntParam(MYSQL_BIND& bind, int& value) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_LONG;
+    bind.buffer = &value;
+}
+
+template <typename IntegerT>
+void bindInt64Param(MYSQL_BIND& bind, IntegerT& value) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_LONGLONG;
+    bind.buffer = &value;
+}
+
+void bindStringResult(MYSQL_BIND& bind, char* buffer, unsigned long bufferLength) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_STRING;
+    bind.buffer = buffer;
+    bind.buffer_length = bufferLength;
+}
+
+void bindIntResult(MYSQL_BIND& bind, int& value) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_LONG;
+    bind.buffer = &value;
+}
+
+void bindInt64Result(MYSQL_BIND& bind, std::int64_t& value) {
+    std::memset(&bind, 0, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_LONGLONG;
+    bind.buffer = &value;
+}
+
+} // anonymous namespace
+
+DbManager::DbManager() : mysql(nullptr) {}
+DbManager::~DbManager() { close(); }
+
+bool DbManager::open(const std::string& dbPath) {
+    if (mysql)
+        return true;
+
+    const std::string host = envValue("XIAOFU_MYSQL_HOST", "127.0.0.1");
+    const unsigned int port = static_cast<unsigned int>(
+        std::strtoul(envValue("XIAOFU_MYSQL_PORT", "3306"), nullptr, 10));
+    const std::string user = envValue("XIAOFU_MYSQL_USER", "xiaofu");
+    const std::string password = envValue("XIAOFU_MYSQL_PASSWORD", "");
+    const std::string database = envValue("XIAOFU_MYSQL_DATABASE", "xiaofu");
+
+    mysql = mysql_init(nullptr);
+    if (!mysql) {
+        Log::error("mysql_init failed");
+        return false;
+    }
+
+    unsigned int connectTimeout = 5;
+    mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &connectTimeout);
+
+    if (!mysql_real_connect(mysql, host.c_str(), user.c_str(), password.c_str(),
+                            database.c_str(), port, nullptr, 0)) {
+        Log::error(std::string("mysql connect failed: ") + mysql_error(mysql));
+        close();
+        return false;
+    }
+
+    if (mysql_set_character_set(mysql, "utf8mb4") != 0) {
+        Log::error(std::string("mysql set charset failed: ") + mysql_error(mysql));
+        close();
+        return false;
+    }
+
+    Log::info("mysql connected, database=" + database + " (path hint: " + dbPath + ")");
+    return true;
+}
+
 bool DbManager::createTables() {
-    const char* userTableSql =
+    static const char* statements[] = {
         "CREATE TABLE IF NOT EXISTS users ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "username TEXT UNIQUE NOT NULL,"
-        "password TEXT NOT NULL,"
-        "email TEXT NOT NULL DEFAULT '',"
-        "created_at TEXT DEFAULT (datetime('now')));";
-    char* errorMessage = nullptr;
-    int resultCode = sqlite3_exec(db, userTableSql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("createTables failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
-    }
-    // 兼容旧库：users 表缺少 email 列时补上，重复添加报错则忽略
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, "ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';", nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::info(std::string("email column already exists: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-    }
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, "ALTER TABLE users ADD COLUMN nickname TEXT NOT NULL DEFAULT '';", nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        sqlite3_free(errorMessage);
-    }
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, "ALTER TABLE users ADD COLUMN avatar_seed INTEGER NOT NULL DEFAULT 0;", nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        sqlite3_free(errorMessage);
-    }
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "username VARCHAR(64) UNIQUE NOT NULL,"
+        "password VARCHAR(128) NOT NULL,"
+        "email VARCHAR(255) NOT NULL DEFAULT '',"
+        "created_at DATETIME NOT NULL DEFAULT NOW(),"
+        "nickname VARCHAR(64) NOT NULL DEFAULT '',"
+        "avatar_seed INT NOT NULL DEFAULT 0"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    const char* contactTableSql =
         "CREATE TABLE IF NOT EXISTS contacts ("
-        "owner_username TEXT NOT NULL,"
-        "contact_username TEXT NOT NULL,"
-        "PRIMARY KEY(owner_username, contact_username));";
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, contactTableSql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("create contacts failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
-    }
+        "owner_username VARCHAR(64) NOT NULL,"
+        "contact_username VARCHAR(64) NOT NULL,"
+        "PRIMARY KEY(owner_username, contact_username)"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    const char* friendRequestTableSql =
         "CREATE TABLE IF NOT EXISTS friend_requests ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "sender_username TEXT NOT NULL,"
-        "receiver_username TEXT NOT NULL,"
-        "status TEXT NOT NULL DEFAULT 'pending',"
-        "created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')));";
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, friendRequestTableSql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("create friend requests failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
-    }
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "sender_username VARCHAR(64) NOT NULL,"
+        "receiver_username VARCHAR(64) NOT NULL,"
+        "status VARCHAR(16) NOT NULL DEFAULT 'pending',"
+        "created_at DATETIME NOT NULL DEFAULT NOW()"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    const char* messageTableSql =
         "CREATE TABLE IF NOT EXISTS messages ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "sender TEXT NOT NULL,"
-        "receiver TEXT NOT NULL,"
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "sender VARCHAR(64) NOT NULL,"
+        "receiver VARCHAR(64) NOT NULL,"
         "content TEXT NOT NULL,"
-        "sent_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')));";
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, messageTableSql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("create messages failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
-    }
+        "sent_at DATETIME NOT NULL DEFAULT NOW()"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    const char* callHistorySql =
         "CREATE TABLE IF NOT EXISTS call_history ("
-        "call_id TEXT PRIMARY KEY,"
-        "caller TEXT NOT NULL,"
-        "callee TEXT NOT NULL,"
-        "state TEXT NOT NULL,"
-        "created_at INTEGER NOT NULL,"
-        "accepted_at INTEGER NOT NULL DEFAULT 0,"
-        "connected_at INTEGER NOT NULL DEFAULT 0,"
-        "ended_at INTEGER NOT NULL,"
-        "duration INTEGER NOT NULL DEFAULT 0,"
-        "end_reason TEXT NOT NULL);";
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, callHistorySql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("create call_history failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
-    }
+        "call_id VARCHAR(64) PRIMARY KEY,"
+        "caller VARCHAR(64) NOT NULL,"
+        "callee VARCHAR(64) NOT NULL,"
+        "state VARCHAR(16) NOT NULL,"
+        "created_at BIGINT NOT NULL,"
+        "accepted_at BIGINT NOT NULL DEFAULT 0,"
+        "connected_at BIGINT NOT NULL DEFAULT 0,"
+        "ended_at BIGINT NOT NULL,"
+        "duration BIGINT NOT NULL DEFAULT 0,"
+        "end_reason VARCHAR(64) NOT NULL"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-    const char* loginlogSql =
         "CREATE TABLE IF NOT EXISTS loginlog ("
-        "username TEXT PRIMARY KEY,"
-        "status TEXT NOT NULL CHECK(status IN ('登录','下线')),"
-        "updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));";
-    errorMessage = nullptr;
-    resultCode = sqlite3_exec(db, loginlogSql, nullptr, nullptr, &errorMessage);
-    if (resultCode != SQLITE_OK) {
-        Log::error(std::string("create loginlog failed: ") + (errorMessage ? errorMessage : "unknown"));
-        sqlite3_free(errorMessage);
-        return false;
+        "username VARCHAR(64) PRIMARY KEY,"
+        "status VARCHAR(16) NOT NULL,"
+        "updated_at DATETIME NOT NULL DEFAULT NOW()"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+    };
+
+    for (const char* sql : statements) {
+        if (mysql_query(mysql, sql) != 0) {
+            Log::error(std::string("createTables failed: ") + mysql_error(mysql));
+            return false;
+        }
     }
     return true;
 }
 
 bool DbManager::insertUser(const std::string& username, const std::string& passwordHash,
                            const std::string& email, const std::string& nickname, int avatarSeed) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "INSERT INTO users (username, password, email, nickname, avatar_seed) VALUES (?, ?, ?, ?, ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, passwordHash.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 3, email.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 4, nickname.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(statement, 5, avatarSeed);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT INTO users (username, password, email, nickname, avatar_seed) "
+        "VALUES (?, ?, ?, ?, ?);");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[5];
+    bindStringParam(params[0], username);
+    bindStringParam(params[1], passwordHash);
+    bindStringParam(params[2], email);
+    bindStringParam(params[3], nickname);
+    bindIntParam(params[4], avatarSeed);
+    const bool succeeded = executeBound(statement, params, 5);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
+bool DbManager::findUser(const std::string& username, std::string& passwordHash) {
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "SELECT password FROM users WHERE username = ?;");
+    if (!statement)
+        return false;
+    MYSQL_BIND param;
+    bindStringParam(param, username);
+    if (!executeBound(statement, &param, 1)) {
+        mysql_stmt_close(statement);
+        return false;
+    }
+    if (mysql_stmt_store_result(statement) != 0) {
+        Log::error(std::string("mysql_stmt_store_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    char passwordBuffer[256] = {0};
+    MYSQL_BIND result;
+    bindStringResult(result, passwordBuffer, sizeof(passwordBuffer));
+    if (mysql_stmt_bind_result(statement, &result) != 0) {
+        Log::error(std::string("mysql_stmt_bind_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    bool found = false;
+    if (mysql_stmt_fetch(statement) == 0) {
+        passwordHash = passwordBuffer;
+        found = true;
+    }
+    mysql_stmt_close(statement);
+    return found;
+}
+
 bool DbManager::saveProfile(const std::string& username, const std::string& nickname, int avatarSeed) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "UPDATE users SET nickname = ?, avatar_seed = ? WHERE username = ?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, nickname.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(statement, 2, avatarSeed);
-    sqlite3_bind_text(statement, 3, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "UPDATE users SET nickname = ?, avatar_seed = ? WHERE username = ?;");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[3];
+    bindStringParam(params[0], nickname);
+    bindIntParam(params[1], avatarSeed);
+    bindStringParam(params[2], username);
+    const bool succeeded = executeBound(statement, params, 3);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 bool DbManager::addContact(const std::string& ownerUsername, const std::string& contactUsername) {
-    if (ownerUsername.empty() || contactUsername.empty() || ownerUsername == contactUsername) return false;
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "INSERT OR IGNORE INTO contacts (owner_username, contact_username) VALUES (?, ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, ownerUsername.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, contactUsername.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    if (ownerUsername.empty() || contactUsername.empty() || ownerUsername == contactUsername)
+        return false;
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT IGNORE INTO contacts (owner_username, contact_username) VALUES (?, ?);");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[2];
+    bindStringParam(params[0], ownerUsername);
+    bindStringParam(params[1], contactUsername);
+    const bool succeeded = executeBound(statement, params, 2);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 bool DbManager::loadContacts(const std::string& ownerUsername, std::vector<ContactProfile>& contacts) {
     contacts.clear();
-    sqlite3_stmt* statement = nullptr;
-    const char* sql =
+    MYSQL_STMT* statement = prepareStatement(mysql,
         "SELECT users.username, users.nickname, users.avatar_seed "
         "FROM contacts JOIN users ON contacts.contact_username = users.username "
-        "WHERE contacts.owner_username = ? ORDER BY users.username ASC;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, ownerUsername.c_str(), -1, SQLITE_TRANSIENT);
-    while (sqlite3_step(statement) == SQLITE_ROW) {
+        "WHERE contacts.owner_username = ? ORDER BY users.username ASC;");
+    if (!statement)
+        return false;
+    MYSQL_BIND param;
+    bindStringParam(param, ownerUsername);
+    if (!executeBound(statement, &param, 1)) {
+        mysql_stmt_close(statement);
+        return false;
+    }
+    if (mysql_stmt_store_result(statement) != 0) {
+        Log::error(std::string("mysql_stmt_store_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    char usernameBuffer[128] = {0};
+    char nicknameBuffer[128] = {0};
+    int avatarSeed = 0;
+    MYSQL_BIND result[3];
+    bindStringResult(result[0], usernameBuffer, sizeof(usernameBuffer));
+    bindStringResult(result[1], nicknameBuffer, sizeof(nicknameBuffer));
+    bindIntResult(result[2], avatarSeed);
+    if (mysql_stmt_bind_result(statement, result) != 0) {
+        Log::error(std::string("mysql_stmt_bind_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    while (mysql_stmt_fetch(statement) == 0) {
         ContactProfile profile;
-        const unsigned char* usernameText = sqlite3_column_text(statement, 0);
-        const unsigned char* nicknameText = sqlite3_column_text(statement, 1);
-        profile.username = usernameText ? reinterpret_cast<const char*>(usernameText) : "";
-        profile.nickname = nicknameText ? reinterpret_cast<const char*>(nicknameText) : "";
-        profile.avatarSeed = sqlite3_column_int(statement, 2);
+        profile.username = usernameBuffer;
+        profile.nickname = nicknameBuffer;
+        profile.avatarSeed = avatarSeed;
         contacts.push_back(profile);
     }
-    sqlite3_finalize(statement);
+    mysql_stmt_close(statement);
     return true;
 }
 
@@ -206,55 +309,89 @@ bool DbManager::createFriendRequest(const std::string& senderUsername,
     if (senderUsername.empty() || receiverUsername.empty() || senderUsername == receiverUsername)
         return false;
 
-    sqlite3_stmt* checkStatement = nullptr;
-    const char* checkSql =
+    MYSQL_STMT* checkStatement = prepareStatement(mysql,
         "SELECT 1 FROM friend_requests WHERE sender_username = ? AND receiver_username = ? "
-        "AND status = 'pending' LIMIT 1;";
-    if (sqlite3_prepare_v2(db, checkSql, -1, &checkStatement, nullptr) != SQLITE_OK)
+        "AND status = 'pending' LIMIT 1;");
+    if (!checkStatement)
         return false;
-    sqlite3_bind_text(checkStatement, 1, senderUsername.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(checkStatement, 2, receiverUsername.c_str(), -1, SQLITE_TRANSIENT);
-    const bool alreadyPending = sqlite3_step(checkStatement) == SQLITE_ROW;
-    sqlite3_finalize(checkStatement);
+    MYSQL_BIND checkParams[2];
+    bindStringParam(checkParams[0], senderUsername);
+    bindStringParam(checkParams[1], receiverUsername);
+    if (!executeBound(checkStatement, checkParams, 2)) {
+        mysql_stmt_close(checkStatement);
+        return false;
+    }
+    mysql_stmt_store_result(checkStatement);
+    int dummy = 0;
+    MYSQL_BIND checkResult;
+    bindIntResult(checkResult, dummy);
+    if (mysql_stmt_bind_result(checkStatement, &checkResult) != 0) {
+        mysql_stmt_close(checkStatement);
+        return false;
+    }
+    const bool alreadyPending = (mysql_stmt_fetch(checkStatement) == 0);
+    mysql_stmt_close(checkStatement);
     if (alreadyPending)
         return false;
 
-    sqlite3_stmt* statement = nullptr;
-    const char* sql =
-        "INSERT INTO friend_requests (sender_username, receiver_username, status) VALUES (?, ?, 'pending');";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK)
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT INTO friend_requests (sender_username, receiver_username, status) "
+        "VALUES (?, ?, 'pending');");
+    if (!statement)
         return false;
-    sqlite3_bind_text(statement, 1, senderUsername.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, receiverUsername.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_BIND params[2];
+    bindStringParam(params[0], senderUsername);
+    bindStringParam(params[1], receiverUsername);
+    const bool succeeded = executeBound(statement, params, 2);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 bool DbManager::loadPendingFriendRequests(const std::string& receiverUsername,
                                           std::vector<FriendRequest>& requests) {
     requests.clear();
-    sqlite3_stmt* statement = nullptr;
-    const char* sql =
-        "SELECT friend_requests.sender_username, users.nickname, users.avatar_seed, friend_requests.created_at "
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "SELECT friend_requests.sender_username, users.nickname, users.avatar_seed, "
+        "friend_requests.created_at "
         "FROM friend_requests JOIN users ON friend_requests.sender_username = users.username "
         "WHERE friend_requests.receiver_username = ? AND friend_requests.status = 'pending' "
-        "ORDER BY friend_requests.id ASC;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK)
+        "ORDER BY friend_requests.id ASC;");
+    if (!statement)
         return false;
-    sqlite3_bind_text(statement, 1, receiverUsername.c_str(), -1, SQLITE_TRANSIENT);
-    while (sqlite3_step(statement) == SQLITE_ROW) {
+    MYSQL_BIND param;
+    bindStringParam(param, receiverUsername);
+    if (!executeBound(statement, &param, 1)) {
+        mysql_stmt_close(statement);
+        return false;
+    }
+    if (mysql_stmt_store_result(statement) != 0) {
+        Log::error(std::string("mysql_stmt_store_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    char senderBuffer[128] = {0};
+    char nicknameBuffer[128] = {0};
+    int avatarSeed = 0;
+    char createdAtBuffer[32] = {0};
+    MYSQL_BIND result[4];
+    bindStringResult(result[0], senderBuffer, sizeof(senderBuffer));
+    bindStringResult(result[1], nicknameBuffer, sizeof(nicknameBuffer));
+    bindIntResult(result[2], avatarSeed);
+    bindStringResult(result[3], createdAtBuffer, sizeof(createdAtBuffer));
+    if (mysql_stmt_bind_result(statement, result) != 0) {
+        Log::error(std::string("mysql_stmt_bind_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    while (mysql_stmt_fetch(statement) == 0) {
         FriendRequest request;
-        const unsigned char* senderText = sqlite3_column_text(statement, 0);
-        const unsigned char* nicknameText = sqlite3_column_text(statement, 1);
-        const unsigned char* createdAtText = sqlite3_column_text(statement, 3);
-        request.senderUsername = senderText ? reinterpret_cast<const char*>(senderText) : "";
-        request.nickname = nicknameText ? reinterpret_cast<const char*>(nicknameText) : request.senderUsername;
-        request.avatarSeed = sqlite3_column_int(statement, 2);
-        request.createdAt = createdAtText ? reinterpret_cast<const char*>(createdAtText) : "";
+        request.senderUsername = senderBuffer;
+        request.nickname = nicknameBuffer;
+        request.avatarSeed = avatarSeed;
+        request.createdAt = createdAtBuffer;
         requests.push_back(request);
     }
-    sqlite3_finalize(statement);
+    mysql_stmt_close(statement);
     return true;
 }
 
@@ -262,78 +399,94 @@ bool DbManager::respondToFriendRequest(const std::string& receiverUsername,
                                        const std::string& senderUsername, bool accepted) {
     if (receiverUsername.empty() || senderUsername.empty())
         return false;
-    if (sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr) != SQLITE_OK)
+    if (mysql_query(mysql, "START TRANSACTION;") != 0) {
+        Log::error(std::string("respondToFriendRequest BEGIN failed: ") + mysql_error(mysql));
         return false;
+    }
 
-    sqlite3_stmt* updateStatement = nullptr;
-    const char* updateSql =
-        "UPDATE friend_requests SET status = ? WHERE sender_username = ? AND receiver_username = ? "
-        "AND status = 'pending';";
-    bool succeeded = sqlite3_prepare_v2(db, updateSql, -1, &updateStatement, nullptr) == SQLITE_OK;
+    MYSQL_STMT* updateStatement = prepareStatement(mysql,
+        "UPDATE friend_requests SET status = ? WHERE sender_username = ? "
+        "AND receiver_username = ? AND status = 'pending';");
+    bool succeeded = (updateStatement != nullptr);
     if (succeeded) {
-        sqlite3_bind_text(updateStatement, 1, accepted ? "accepted" : "rejected", -1, SQLITE_STATIC);
-        sqlite3_bind_text(updateStatement, 2, senderUsername.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(updateStatement, 3, receiverUsername.c_str(), -1, SQLITE_TRANSIENT);
-        succeeded = sqlite3_step(updateStatement) == SQLITE_DONE && sqlite3_changes(db) == 1;
+        std::string statusText = accepted ? "accepted" : "rejected";
+        MYSQL_BIND params[3];
+        bindStringParam(params[0], statusText);
+        bindStringParam(params[1], senderUsername);
+        bindStringParam(params[2], receiverUsername);
+        succeeded = executeBound(updateStatement, params, 3)
+            && mysql_stmt_affected_rows(updateStatement) == 1;
     }
     if (updateStatement)
-        sqlite3_finalize(updateStatement);
+        mysql_stmt_close(updateStatement);
+
     if (succeeded && accepted)
         succeeded = addContact(senderUsername, receiverUsername)
             && addContact(receiverUsername, senderUsername);
 
-    sqlite3_exec(db, succeeded ? "COMMIT;" : "ROLLBACK;", nullptr, nullptr, nullptr);
+    if (succeeded) {
+        if (mysql_query(mysql, "COMMIT;") != 0) {
+            Log::error(std::string("respondToFriendRequest COMMIT failed: ") + mysql_error(mysql));
+            mysql_query(mysql, "ROLLBACK;");
+            succeeded = false;
+        }
+    } else {
+        mysql_query(mysql, "ROLLBACK;");
+    }
     return succeeded;
 }
 
-bool DbManager::findUser(const std::string& username, std::string& passwordHash) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "SELECT password FROM users WHERE username = ?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    bool found = false;
-    if (sqlite3_step(statement) == SQLITE_ROW) {
-        const unsigned char* passwordText = sqlite3_column_text(statement, 0);
-        if (passwordText) passwordHash = reinterpret_cast<const char*>(passwordText);
-        found = true;
-    }
-    sqlite3_finalize(statement);
-    return found;
-}
-
 bool DbManager::updatePassword(const std::string& username, const std::string& newPasswordHash) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "UPDATE users SET password = ? WHERE username = ?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, newPasswordHash.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "UPDATE users SET password = ? WHERE username = ?;");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[2];
+    bindStringParam(params[0], newPasswordHash);
+    bindStringParam(params[1], username);
+    const bool succeeded = executeBound(statement, params, 2);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 // 保存聊天记录，并回填数据库生成的消息编号和发送时间。
 bool DbManager::saveMessage(ChatMessage& message) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, message.sender.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, message.receiver.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 3, message.content.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
-    if (!succeeded) return false;
-
-    message.id = sqlite3_last_insert_rowid(db);
-    statement = nullptr;
-    const char* timeSql = "SELECT sent_at FROM messages WHERE id = ?;";
-    if (sqlite3_prepare_v2(db, timeSql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_int64(statement, 1, message.id);
-    if (sqlite3_step(statement) == SQLITE_ROW) {
-        const unsigned char* timeText = sqlite3_column_text(statement, 0);
-        if (timeText) message.sentAt = reinterpret_cast<const char*>(timeText);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?);");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[3];
+    bindStringParam(params[0], message.sender);
+    bindStringParam(params[1], message.receiver);
+    bindStringParam(params[2], message.content);
+    if (!executeBound(statement, params, 3)) {
+        mysql_stmt_close(statement);
+        return false;
     }
-    sqlite3_finalize(statement);
+    message.id = static_cast<long long>(mysql_stmt_insert_id(statement));
+    mysql_stmt_close(statement);
+
+    MYSQL_STMT* timeStatement = prepareStatement(mysql,
+        "SELECT sent_at FROM messages WHERE id = ?;");
+    if (!timeStatement)
+        return false;
+    MYSQL_BIND idParam;
+    bindInt64Param(idParam, message.id);
+    if (!executeBound(timeStatement, &idParam, 1)) {
+        mysql_stmt_close(timeStatement);
+        return false;
+    }
+    mysql_stmt_store_result(timeStatement);
+    char sentAtBuffer[32] = {0};
+    MYSQL_BIND result;
+    bindStringResult(result, sentAtBuffer, sizeof(sentAtBuffer));
+    if (mysql_stmt_bind_result(timeStatement, &result) != 0) {
+        mysql_stmt_close(timeStatement);
+        return false;
+    }
+    if (mysql_stmt_fetch(timeStatement) == 0)
+        message.sentAt = sentAtBuffer;
+    mysql_stmt_close(timeStatement);
     return true;
 }
 
@@ -341,108 +494,179 @@ bool DbManager::saveMessage(ChatMessage& message) {
 bool DbManager::loadConversation(const std::string& username, const std::string& peer,
                                  std::vector<ChatMessage>& messages) {
     messages.clear();
-    sqlite3_stmt* statement = nullptr;
-    const char* sql =
+    MYSQL_STMT* statement = prepareStatement(mysql,
         "SELECT id, sender, receiver, content, sent_at FROM messages "
         "WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) "
-        "ORDER BY id ASC;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, peer.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 3, peer.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 4, username.c_str(), -1, SQLITE_TRANSIENT);
-    while (sqlite3_step(statement) == SQLITE_ROW) {
+        "ORDER BY id ASC;");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[4];
+    bindStringParam(params[0], username);
+    bindStringParam(params[1], peer);
+    bindStringParam(params[2], peer);
+    bindStringParam(params[3], username);
+    if (!executeBound(statement, params, 4)) {
+        mysql_stmt_close(statement);
+        return false;
+    }
+    if (mysql_stmt_store_result(statement) != 0) {
+        Log::error(std::string("mysql_stmt_store_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    std::int64_t id = 0;
+    char senderBuffer[128] = {0};
+    char receiverBuffer[128] = {0};
+    // TEXT 列按 MySQL 最大长度 65535 绑定，避免客户端把长文本判定为截断。
+    std::vector<char> contentBuffer(65536, 0);
+    char sentAtBuffer[32] = {0};
+    MYSQL_BIND result[5];
+    bindInt64Result(result[0], id);
+    bindStringResult(result[1], senderBuffer, sizeof(senderBuffer));
+    bindStringResult(result[2], receiverBuffer, sizeof(receiverBuffer));
+    bindStringResult(result[3], contentBuffer.data(), static_cast<unsigned long>(contentBuffer.size()));
+    bindStringResult(result[4], sentAtBuffer, sizeof(sentAtBuffer));
+    if (mysql_stmt_bind_result(statement, result) != 0) {
+        Log::error(std::string("mysql_stmt_bind_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    while (mysql_stmt_fetch(statement) == 0) {
         ChatMessage message;
-        message.id = sqlite3_column_int64(statement, 0);
-        const unsigned char* senderText = sqlite3_column_text(statement, 1);
-        const unsigned char* receiverText = sqlite3_column_text(statement, 2);
-        const unsigned char* contentText = sqlite3_column_text(statement, 3);
-        const unsigned char* timeText = sqlite3_column_text(statement, 4);
-        message.sender = senderText ? reinterpret_cast<const char*>(senderText) : "";
-        message.receiver = receiverText ? reinterpret_cast<const char*>(receiverText) : "";
-        message.content = contentText ? reinterpret_cast<const char*>(contentText) : "";
-        message.sentAt = timeText ? reinterpret_cast<const char*>(timeText) : "";
+        message.id = id;
+        message.sender = senderBuffer;
+        message.receiver = receiverBuffer;
+        message.content = contentBuffer.data();
+        message.sentAt = sentAtBuffer;
         messages.push_back(message);
     }
-    sqlite3_finalize(statement);
+    mysql_stmt_close(statement);
     return true;
 }
 
 bool DbManager::deleteConversation(const std::string& username, const std::string& peer) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "DELETE FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, peer.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 3, peer.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 4, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "DELETE FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?);");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[4];
+    bindStringParam(params[0], username);
+    bindStringParam(params[1], peer);
+    bindStringParam(params[2], peer);
+    bindStringParam(params[3], username);
+    const bool succeeded = executeBound(statement, params, 4);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 bool DbManager::deleteAllMessages(const std::string& username) {
-    sqlite3_stmt* statement = nullptr;
-    const char* sql = "DELETE FROM messages WHERE sender = ? OR receiver = ?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(statement, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool succeeded = sqlite3_step(statement) == SQLITE_DONE;
-    sqlite3_finalize(statement);
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "DELETE FROM messages WHERE sender = ? OR receiver = ?;");
+    if (!statement)
+        return false;
+    MYSQL_BIND params[2];
+    bindStringParam(params[0], username);
+    bindStringParam(params[1], username);
+    const bool succeeded = executeBound(statement, params, 2);
+    mysql_stmt_close(statement);
     return succeeded;
 }
 
 bool DbManager::saveCallRecord(const CallRecord& record) {
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql =
-        "INSERT OR REPLACE INTO call_history "
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT INTO call_history "
         "(call_id, caller, callee, state, created_at, accepted_at, connected_at, "
         " ended_at, duration, end_reason) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(stmt, 1, record.callId.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 2, record.caller.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 3, record.callee.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 4, record.state.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int64(stmt, 5, record.createdAt);
-    sqlite3_bind_int64(stmt, 6, record.acceptedAt);
-    sqlite3_bind_int64(stmt, 7, record.connectedAt);
-    sqlite3_bind_int64(stmt, 8, record.endedAt);
-    sqlite3_bind_int64(stmt, 9, record.duration);
-    sqlite3_bind_text(stmt, 10, record.endReason.c_str(), -1, SQLITE_TRANSIENT);
-    const bool ok = sqlite3_step(stmt) == SQLITE_DONE;
-    sqlite3_finalize(stmt);
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "AS new ON DUPLICATE KEY UPDATE "
+        "caller=new.caller, callee=new.callee, state=new.state, "
+        "created_at=new.created_at, accepted_at=new.accepted_at, "
+        "connected_at=new.connected_at, ended_at=new.ended_at, "
+        "duration=new.duration, end_reason=new.end_reason;");
+    if (!statement)
+        return false;
+    std::int64_t createdAt = record.createdAt;
+    std::int64_t acceptedAt = record.acceptedAt;
+    std::int64_t connectedAt = record.connectedAt;
+    std::int64_t endedAt = record.endedAt;
+    std::int64_t duration = record.duration;
+    MYSQL_BIND params[10];
+    bindStringParam(params[0], record.callId);
+    bindStringParam(params[1], record.caller);
+    bindStringParam(params[2], record.callee);
+    bindStringParam(params[3], record.state);
+    bindInt64Param(params[4], createdAt);
+    bindInt64Param(params[5], acceptedAt);
+    bindInt64Param(params[6], connectedAt);
+    bindInt64Param(params[7], endedAt);
+    bindInt64Param(params[8], duration);
+    bindStringParam(params[9], record.endReason);
+    const bool ok = executeBound(statement, params, 10);
+    mysql_stmt_close(statement);
     return ok;
 }
 
 bool DbManager::loadCallRecords(const std::string& username, int limit,
-                                 std::vector<CallRecord>& records) {
+                                std::vector<CallRecord>& records) {
     records.clear();
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql =
+    MYSQL_STMT* statement = prepareStatement(mysql,
         "SELECT call_id, caller, callee, state, created_at, accepted_at, connected_at, "
         "ended_at, duration, end_reason FROM call_history "
         "WHERE caller = ? OR callee = ? "
-        "ORDER BY ended_at DESC LIMIT ?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 2, username.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(stmt, 3, limit > 0 ? limit : 50);
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        CallRecord r;
-        r.callId     = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-        r.caller     = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-        r.callee     = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-        r.state      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-        r.createdAt  = sqlite3_column_int64(stmt, 4);
-        r.acceptedAt = sqlite3_column_int64(stmt, 5);
-        r.connectedAt= sqlite3_column_int64(stmt, 6);
-        r.endedAt    = sqlite3_column_int64(stmt, 7);
-        r.duration   = sqlite3_column_int64(stmt, 8);
-        r.endReason  = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 9));
-        records.push_back(r);
+        "ORDER BY ended_at DESC LIMIT ?;");
+    if (!statement)
+        return false;
+    int effectiveLimit = limit > 0 ? limit : 50;
+    MYSQL_BIND params[3];
+    bindStringParam(params[0], username);
+    bindStringParam(params[1], username);
+    bindIntParam(params[2], effectiveLimit);
+    if (!executeBound(statement, params, 3)) {
+        mysql_stmt_close(statement);
+        return false;
     }
-    sqlite3_finalize(stmt);
+    if (mysql_stmt_store_result(statement) != 0) {
+        Log::error(std::string("mysql_stmt_store_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    char callIdBuffer[128] = {0};
+    char callerBuffer[128] = {0};
+    char calleeBuffer[128] = {0};
+    char stateBuffer[32] = {0};
+    std::int64_t createdAt = 0, acceptedAt = 0, connectedAt = 0, endedAt = 0, duration = 0;
+    char endReasonBuffer[128] = {0};
+    MYSQL_BIND result[10];
+    bindStringResult(result[0], callIdBuffer, sizeof(callIdBuffer));
+    bindStringResult(result[1], callerBuffer, sizeof(callerBuffer));
+    bindStringResult(result[2], calleeBuffer, sizeof(calleeBuffer));
+    bindStringResult(result[3], stateBuffer, sizeof(stateBuffer));
+    bindInt64Result(result[4], createdAt);
+    bindInt64Result(result[5], acceptedAt);
+    bindInt64Result(result[6], connectedAt);
+    bindInt64Result(result[7], endedAt);
+    bindInt64Result(result[8], duration);
+    bindStringResult(result[9], endReasonBuffer, sizeof(endReasonBuffer));
+    if (mysql_stmt_bind_result(statement, result) != 0) {
+        Log::error(std::string("mysql_stmt_bind_result failed: ") + mysql_stmt_error(statement));
+        mysql_stmt_close(statement);
+        return false;
+    }
+    while (mysql_stmt_fetch(statement) == 0) {
+        CallRecord record;
+        record.callId = callIdBuffer;
+        record.caller = callerBuffer;
+        record.callee = calleeBuffer;
+        record.state = stateBuffer;
+        record.createdAt = createdAt;
+        record.acceptedAt = acceptedAt;
+        record.connectedAt = connectedAt;
+        record.endedAt = endedAt;
+        record.duration = duration;
+        record.endReason = endReasonBuffer;
+        records.push_back(record);
+    }
+    mysql_stmt_close(statement);
     return true;
 }
 
@@ -451,104 +675,113 @@ bool DbManager::loadCallRecords(const std::string& username, int limit,
 // ============================================================
 
 bool DbManager::resetAllLoginStatus() {
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql = "UPDATE loginlog SET status='下线', updated_at=datetime('now','localtime') WHERE status='登录';";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        Log::error("resetAllLoginStatus: prepare failed");
+    if (mysql_query(mysql,
+        "UPDATE loginlog SET status='下线', updated_at=NOW() WHERE status='登录';") != 0) {
+        Log::error(std::string("resetAllLoginStatus failed: ") + mysql_error(mysql));
         return false;
     }
-    sqlite3_step(stmt);
-    const int changed = sqlite3_changes(db);
-    sqlite3_finalize(stmt);
+    const my_ulonglong changed = mysql_affected_rows(mysql);
     if (changed > 0)
         Log::info("resetAllLoginStatus: reset " + std::to_string(changed) + " login(s) to offline");
     return true;
 }
 
 bool DbManager::tryLogin(const std::string& username) {
-    if (username.empty()) return false;
+    if (username.empty())
+        return false;
 
-    // BEGIN IMMEDIATE prevents concurrent writes for the same row
-    char* errMsg = nullptr;
-    if (sqlite3_exec(db, "BEGIN IMMEDIATE;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
-        Log::error(std::string("tryLogin BEGIN failed: ") + (errMsg ? errMsg : "unknown"));
-        if (errMsg) sqlite3_free(errMsg);
+    // MySQL 没有 BEGIN IMMEDIATE：用事务 + SELECT ... FOR UPDATE 行锁，
+    // 保证同一账号的两个并发登录请求只有一个能成功。
+    if (mysql_query(mysql, "START TRANSACTION;") != 0) {
+        Log::error(std::string("tryLogin START TRANSACTION failed: ") + mysql_error(mysql));
         return false;
     }
 
-    // Step 1: check current status
-    sqlite3_stmt* stmt = nullptr;
-    const char* selectSql = "SELECT status FROM loginlog WHERE username = ?;";
-    if (sqlite3_prepare_v2(db, selectSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-        Log::error("tryLogin select prepare failed");
+    // Step 1: 锁定该账号 loginlog 行（不存在时锁间隙，后续 INSERT 由唯一键兜底）
+    MYSQL_STMT* selectStatement = prepareStatement(mysql,
+        "SELECT status FROM loginlog WHERE username = ? FOR UPDATE;");
+    if (!selectStatement) {
+        mysql_query(mysql, "ROLLBACK;");
         return false;
     }
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-
-    bool exists = false;
-    std::string currentStatus;
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        exists = true;
-        const unsigned char* text = sqlite3_column_text(stmt, 0);
-        if (text) currentStatus = reinterpret_cast<const char*>(text);
+    MYSQL_BIND selectParam;
+    bindStringParam(selectParam, username);
+    if (!executeBound(selectStatement, &selectParam, 1)) {
+        mysql_stmt_close(selectStatement);
+        mysql_query(mysql, "ROLLBACK;");
+        return false;
     }
-    sqlite3_finalize(stmt);
+    mysql_stmt_store_result(selectStatement);
+    char statusBuffer[32] = {0};
+    MYSQL_BIND selectResult;
+    bindStringResult(selectResult, statusBuffer, sizeof(statusBuffer));
+    if (mysql_stmt_bind_result(selectStatement, &selectResult) != 0) {
+        mysql_stmt_close(selectStatement);
+        mysql_query(mysql, "ROLLBACK;");
+        return false;
+    }
+    const bool exists = (mysql_stmt_fetch(selectStatement) == 0);
+    mysql_stmt_close(selectStatement);
 
-    if (exists && currentStatus == "登录") {
-        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    if (exists && std::string(statusBuffer) == "登录") {
+        mysql_query(mysql, "ROLLBACK;");
         Log::info("tryLogin: username=" + username + " already logged in, rejected");
         return false;
     }
 
-    // Step 2: upsert to "登录"
+    // Step 2: upsert 为“登录”
+    bool ok = false;
     if (exists) {
-        const char* updateSql =
-            "UPDATE loginlog SET status='登录', updated_at=datetime('now','localtime') WHERE username=?;";
-        if (sqlite3_prepare_v2(db, updateSql, -1, &stmt, nullptr) != SQLITE_OK) {
-            sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-            Log::error("tryLogin update prepare failed");
-            return false;
+        MYSQL_STMT* updateStatement = prepareStatement(mysql,
+            "UPDATE loginlog SET status='登录', updated_at=NOW() WHERE username=?;");
+        if (updateStatement) {
+            MYSQL_BIND updateParam;
+            bindStringParam(updateParam, username);
+            ok = executeBound(updateStatement, &updateParam, 1);
+            mysql_stmt_close(updateStatement);
         }
-        sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     } else {
-        const char* insertSql =
-            "INSERT INTO loginlog (username, status, updated_at) VALUES (?, '登录', datetime('now','localtime'));";
-        if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, nullptr) != SQLITE_OK) {
-            sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-            Log::error("tryLogin insert prepare failed");
-            return false;
+        MYSQL_STMT* insertStatement = prepareStatement(mysql,
+            "INSERT INTO loginlog (username, status, updated_at) VALUES (?, '登录', NOW());");
+        if (insertStatement) {
+            MYSQL_BIND insertParam;
+            bindStringParam(insertParam, username);
+            ok = executeBound(insertStatement, &insertParam, 1);
+            mysql_stmt_close(insertStatement);
         }
-        sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     }
-
-    const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
 
     if (ok) {
-        sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
-        Log::info("tryLogin: username=" + username + " => 登录");
-    } else {
-        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
-        Log::error("tryLogin: username=" + username + " upsert failed");
+        if (mysql_query(mysql, "COMMIT;") == 0) {
+            Log::info("tryLogin: username=" + username + " => 登录");
+            return true;
+        }
+        Log::error(std::string("tryLogin COMMIT failed: ") + mysql_error(mysql));
+        mysql_query(mysql, "ROLLBACK;");
+        return false;
     }
-    return ok;
+
+    // 并发 INSERT 可能触发死锁/唯一键冲突，此时本请求失败、另一请求已成功。
+    Log::error(std::string("tryLogin upsert failed: ") + mysql_error(mysql));
+    mysql_query(mysql, "ROLLBACK;");
+    return false;
 }
 
 bool DbManager::setOffline(const std::string& username) {
-    if (username.empty()) return false;
+    if (username.empty())
+        return false;
 
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql =
-        "UPDATE loginlog SET status='下线', updated_at=datetime('now','localtime') WHERE username=?;";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "UPDATE loginlog SET status='下线', updated_at=NOW() WHERE username=?;");
+    if (!statement) {
         Log::error("setOffline prepare failed");
         return false;
     }
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    const int changed = sqlite3_changes(db);
-    sqlite3_finalize(stmt);
+    MYSQL_BIND param;
+    bindStringParam(param, username);
+    const bool ok = executeBound(statement, &param, 1);
+    const my_ulonglong changed = mysql_stmt_affected_rows(statement);
+    mysql_stmt_close(statement);
 
     if (changed > 0)
         Log::info("setOffline: username=" + username + " => 下线");
@@ -558,18 +791,19 @@ bool DbManager::setOffline(const std::string& username) {
 }
 
 bool DbManager::initLoginlogForUser(const std::string& username) {
-    if (username.empty()) return false;
+    if (username.empty())
+        return false;
 
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql =
-        "INSERT OR IGNORE INTO loginlog (username, status, updated_at) VALUES (?, '下线', datetime('now','localtime'));";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    MYSQL_STMT* statement = prepareStatement(mysql,
+        "INSERT IGNORE INTO loginlog (username, status, updated_at) VALUES (?, '下线', NOW());");
+    if (!statement) {
         Log::error("initLoginlogForUser prepare failed");
         return false;
     }
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-    const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
+    MYSQL_BIND param;
+    bindStringParam(param, username);
+    const bool ok = executeBound(statement, &param, 1);
+    mysql_stmt_close(statement);
 
     if (ok)
         Log::info("initLoginlogForUser: username=" + username + " => 下线");
@@ -577,5 +811,8 @@ bool DbManager::initLoginlogForUser(const std::string& username) {
 }
 
 void DbManager::close() {
-    if (db) { sqlite3_close(db); db = nullptr; }
+    if (mysql) {
+        mysql_close(mysql);
+        mysql = nullptr;
+    }
 }

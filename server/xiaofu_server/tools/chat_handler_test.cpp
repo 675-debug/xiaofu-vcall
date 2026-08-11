@@ -22,7 +22,7 @@ void check(bool condition, const char* name) {
 
 int main() {
     DbManager db;
-    check(db.open(":memory:"), "open in-memory database");
+    check(db.open("mysql-test"), "open mysql test database");
     check(db.createTables(), "create message table");
 
     // 联系人资料必须是单向关系：Alice 添加 Bob，不会自动反向添加。
@@ -93,12 +93,10 @@ int main() {
     check(chatHandler.loadHistory("alice", "charlie", history) && history.empty(),
           "all user messages are removed");
 
-    // 两个线程各用一个 SQLite 连接，模拟线程池 worker 并发保存消息。
-    const char* concurrentDatabasePath = "xiaofu-chat-concurrency-test.db";
-    std::remove(concurrentDatabasePath);
+    // 两个线程各用一个 MySQL 连接，模拟线程池 worker 并发保存消息。
     {
         DbManager setupDatabase;
-        check(setupDatabase.open(concurrentDatabasePath), "open concurrent test database");
+        check(setupDatabase.open("mysql-test"), "open concurrent test database");
         check(setupDatabase.createTables(), "create concurrent test tables");
         check(setupDatabase.insertUser("workerA", "hash", "a@example.com"),
               "create worker A");
@@ -109,7 +107,7 @@ int main() {
     std::atomic<int> savedMessages{0};
     auto saveMessages = [&](const std::string& sender, const std::string& receiver) {
         DbManager workerDatabase;
-        if (!workerDatabase.open(concurrentDatabasePath))
+        if (!workerDatabase.open("mysql-test"))
             return;
         for (int index = 0; index < 20; ++index) {
             ChatMessage message;
@@ -128,13 +126,12 @@ int main() {
     {
         DbManager verifyDatabase;
         std::vector<ChatMessage> concurrentHistory;
-        check(verifyDatabase.open(concurrentDatabasePath), "reopen concurrent test database");
+        check(verifyDatabase.open("mysql-test"), "reopen concurrent test database");
         check(verifyDatabase.loadConversation("workerA", "workerB", concurrentHistory),
               "load concurrent history");
         check(savedMessages.load() == 40 && concurrentHistory.size() == 40,
               "two database workers save all messages");
     }
-    std::remove(concurrentDatabasePath);
 
     std::printf(failures == 0 ? "ALL PASS\n" : "FAILURES: %d\n", failures);
     return failures == 0 ? 0 : 1;

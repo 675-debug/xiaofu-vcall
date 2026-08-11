@@ -6,22 +6,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 
-if(WIN32)
-    # 保留 Windows 上运行单元测试所需的本地 SQLite 静态库。
-    set(SQLITE_INCLUDE_DIR "D:/app/Qt/Tools/mingw730_64/opt/include"
-        CACHE PATH "sqlite3 include dir")
-    set(SQLITE_LIBRARY_TARGET
-        "D:/app/Qt/Tools/mingw730_64/opt/lib/libsqlite3.a"
-        CACHE FILEPATH "sqlite3 static lib")
-    set(PASSWORD_HASH_LIBRARY advapi32)
-else()
-    find_package(SQLite3 REQUIRED)
-    find_package(OpenSSL REQUIRED)
-    set(SQLITE_INCLUDE_DIR "")
-    set(SQLITE_LIBRARY_TARGET SQLite::SQLite3)
-    set(PASSWORD_HASH_LIBRARY OpenSSL::Crypto)
-endif()
+find_path(MYSQLCLIENT_INCLUDE_DIR mysql/mysql.h REQUIRED)
+find_library(MYSQLCLIENT_LIBRARY mysqlclient REQUIRED)
+set(MYSQL_LIBRARY_TARGET ${MYSQLCLIENT_LIBRARY})
+set(MYSQL_INCLUDE_DIR ${MYSQLCLIENT_INCLUDE_DIR})
+set(PASSWORD_HASH_LIBRARY OpenSSL::Crypto)
 
 set(BUSINESS_SOURCES
     src/protocol/JsonValue.cpp
@@ -55,7 +46,7 @@ if(UNIX AND NOT APPLE)
     add_executable(xiaofu-server ${SERVER_SOURCES})
     target_include_directories(xiaofu-server PRIVATE src)
     target_link_libraries(xiaofu-server PRIVATE
-        ${SQLITE_LIBRARY_TARGET}
+        ${MYSQL_LIBRARY_TARGET}
         ${PASSWORD_HASH_LIBRARY}
         Threads::Threads)
 endif()
@@ -73,9 +64,9 @@ add_executable(chat_handler_test
     src/handler/ChatHandler.cpp
     src/handler/JoinHandler.cpp
     src/util/Log.cpp)
-target_include_directories(chat_handler_test PRIVATE src ${SQLITE_INCLUDE_DIR})
+target_include_directories(chat_handler_test PRIVATE src ${MYSQL_INCLUDE_DIR})
 target_link_libraries(chat_handler_test PRIVATE
-    ${SQLITE_LIBRARY_TARGET}
+    ${MYSQL_LIBRARY_TARGET}
     Threads::Threads)
 
 add_executable(thread_pool_test
@@ -83,9 +74,9 @@ add_executable(thread_pool_test
     src/concurrency/ThreadPool.cpp
     src/db/DbManager.cpp
     src/util/Log.cpp)
-target_include_directories(thread_pool_test PRIVATE src ${SQLITE_INCLUDE_DIR})
+target_include_directories(thread_pool_test PRIVATE src ${MYSQL_INCLUDE_DIR})
 target_link_libraries(thread_pool_test PRIVATE
-    ${SQLITE_LIBRARY_TARGET}
+    ${MYSQL_LIBRARY_TARGET}
     Threads::Threads)
 
 if(WIN32)
@@ -93,12 +84,17 @@ if(WIN32)
     target_link_libraries(test_client PRIVATE ws2_32)
 endif()
 
-add_executable(db_check tools/db_check.cpp)
-target_include_directories(db_check PRIVATE ${SQLITE_INCLUDE_DIR})
-target_link_libraries(db_check PRIVATE ${SQLITE_LIBRARY_TARGET})
-
 add_executable(call_session_test
     tools/call_session_test.cpp
     src/handler/CallSession.cpp
     src/util/Log.cpp)
 target_include_directories(call_session_test PRIVATE src)
+
+add_executable(login_concurrency_test
+    tools/login_concurrency_test.cpp
+    src/db/DbManager.cpp
+    src/util/Log.cpp)
+target_include_directories(login_concurrency_test PRIVATE src ${MYSQL_INCLUDE_DIR})
+target_link_libraries(login_concurrency_test PRIVATE
+    ${MYSQL_LIBRARY_TARGET}
+    Threads::Threads)

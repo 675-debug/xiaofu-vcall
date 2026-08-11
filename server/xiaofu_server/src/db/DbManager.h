@@ -2,7 +2,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
-#include <sqlite3.h>
+#include <mysql/mysql.h>
 
 struct ChatMessage {
     long long id = 0;
@@ -77,5 +77,5 @@ public:
     void close();
 
 private:
-    sqlite3* db;
+    MYSQL* mysql;
 };

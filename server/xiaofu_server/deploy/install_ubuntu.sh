@@ -10,7 +10,7 @@ project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 build_dir="${project_root}/xiaofu_server/build-linux-release"
 
 apt-get update
-apt-get install -y build-essential cmake libsqlite3-dev libssl-dev
+apt-get install -y build-essential cmake libmysqlclient-dev libssl-dev
 
 cmake -S "${project_root}/xiaofu_server" -B "${build_dir}" -DCMAKE_BUILD_TYPE=Release
 cmake --build "${build_dir}" --target xiaofu-server -j"$(nproc)"

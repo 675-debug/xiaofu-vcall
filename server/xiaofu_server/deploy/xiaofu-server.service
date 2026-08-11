@@ -1,7 +1,7 @@
 [Unit]
 Description=xiaofu-vcall epoll server
-After=network-online.target
-Wants=network-online.target
+After=network-online.target mysql.service
+Wants=network-online.target mysql.service
 
 [Service]
 Type=simple
@@ -9,6 +9,7 @@ User=xiaofu
 Group=xiaofu
 WorkingDirectory=/opt/xiaofu-vcall
 Environment=XIAOFU_DATA_DIR=/var/lib/xiaofu-vcall
+EnvironmentFile=/etc/xiaofu-server.env
 ExecStart=/opt/xiaofu-vcall/bin/xiaofu-server --host 0.0.0.0 --port 9000 --workers 2
 Restart=on-failure
 RestartSec=3
