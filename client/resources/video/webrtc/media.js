@@ -5,7 +5,6 @@
         qvga: { name: 'qvga', label: '320x240', uiLabel: '流畅', width: 320, height: 240 },
         vga: { name: 'vga', label: '640x480', uiLabel: '标准', width: 640, height: 480 },
         hd: { name: 'hd', label: '1280x720', uiLabel: '高清', width: 1280, height: 720 },
-        fhd: { name: 'fhd', label: '1920x1080', uiLabel: '1080P', width: 1920, height: 1080 }
     };
 
     function stopTracks(stream) {
@@ -202,12 +201,10 @@
         X.state.cameraDeviceClass = cls;
         if (cls === 'lrcp') {
             X.state.cameraSafeProfiles = ['qvga', 'vga'];
-            X.state.cameraExperimentalProfiles = ['hd', 'fhd'];
         } else {
             X.state.cameraSafeProfiles = ['qvga', 'vga', 'hd'];
-            X.state.cameraExperimentalProfiles = ['fhd'];
         }
-        X.log.media('CAMERA_PROFILE_CLASS class=' + cls + ' safe=' + X.state.cameraSafeProfiles.join(',') + ' experimental=' + X.state.cameraExperimentalProfiles.join(',') + ' cameraLabel=' + X.state.cameraDeviceLabel);
+        X.log.media('CAMERA_PROFILE_CLASS class=' + cls + ' safe=' + X.state.cameraSafeProfiles.join(',') + ' cameraLabel=' + X.state.cameraDeviceLabel);
     }
 
     function clearMutedDebounce() {
@@ -476,7 +473,6 @@
             });
             refreshDeviceList();
             initDeviceChange();
-            if (X.state.cameraProbeEnabled) X.probe.startProbe();
             return stream;
         } catch (error) {
             X.log.warn('Media', 'CAMERA_REQUEST_FAILED profile=' + resolved.name + ' name=' + (error && error.name ? error.name : 'unknown') + ' message=' + (error && error.message ? error.message : X.text(error)) + ' constraint=' + (error && error.constraint ? error.constraint : 'none') + ' cameraLabel=' + X.state.cameraDeviceLabel);
@@ -684,8 +680,7 @@
             return Promise.reject(new Error('invalid profile ' + X.text(profileName)));
         }
         var safe = X.state.cameraSafeProfiles.indexOf(resolved.name) >= 0;
-        var experimental = X.state.cameraExperimentalProfiles.indexOf(resolved.name) >= 0;
-        if (!safe && !(experimental && X.state.cameraProbeEnabled)) {
+        if (!safe) {
             return Promise.reject(new Error('profile not available ' + resolved.name));
         }
         if (X.state.localCameraUnavailable) {
@@ -733,15 +728,6 @@
         return result;
     }
 
-    function getExperimentalProfiles() {
-        var result = [];
-        X.state.cameraExperimentalProfiles.forEach(function (name) {
-            var profile = cameraProfiles[name];
-            if (profile) result.push(profile);
-        });
-        return result;
-    }
-
     function getProfileInfo(profileName) {
         var profile = resolveProfile(profileName);
         if (!profile) return null;
@@ -751,8 +737,7 @@
             uiLabel: profile.uiLabel,
             width: profile.width,
             height: profile.height,
-            safe: X.state.cameraSafeProfiles.indexOf(profile.name) >= 0,
-            experimental: X.state.cameraExperimentalProfiles.indexOf(profile.name) >= 0
+            safe: X.state.cameraSafeProfiles.indexOf(profile.name) >= 0
         };
     }
 
@@ -920,7 +905,6 @@
         setCameraProfile: setCameraProfile,
         getCurrentCameraProfile: getCurrentCameraProfile,
         getUIVisibleProfiles: getUIVisibleProfiles,
-        getExperimentalProfiles: getExperimentalProfiles,
         getProfileInfo: getProfileInfo,
         getCameraLabel: getCameraLabel,
         stopLocalStream: stopLocalStream,

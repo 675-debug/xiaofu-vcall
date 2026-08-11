@@ -44,20 +44,13 @@
         if (token !== X.state.callToken || !X.state.callActive) return;
         X.log.peer('ROLE caller');
         var pc = X.peer.createPeerConnection();
-        var attached = await X.peer.attachLocalVideoTrack(pc, stream);
-        if (!attached) {
-            X.log.warn('Signal', 'OUTGOING_NO_CAMERA_RECVONLY');
-            X.peer.ensureRecvOnlyVideo(pc);
-        }
         var track = X.media.getVideoTrack(stream);
         await X.peer.ensureVideoSenderTrack(track);
-        X.peer.verifyVideoTx('caller-before-offer');
         var offer = await pc.createOffer();
         if (token !== X.state.callToken || pc !== X.state.peerConnection || !X.state.callActive) return;
         await pc.setLocalDescription(offer);
         X.ice.sdpSummary('LOCAL_OFFER', offer.sdp);
         X.log.ice('LOCAL_OFFER_VIDEO_DIRECTION ' + X.ice.sdpVideoInfo(offer.sdp));
-        X.peer.verifyVideoTx('caller-after-local-offer');
         X.log.signal('OFFER_CREATED chars=' + offer.sdp.length);
         X.bridge.sendSignal({ type: 'webrtc_offer', sdp: offer.sdp });
     }
@@ -81,21 +74,15 @@
         } else {
             X.log.warn('Peer', 'CALLEE_TRACK_BIND_FAIL');
         }
-        var before = X.peer.verifyVideoTx('callee-before-setremote');
-        X.log.peer('BEFORE_CREATE_ANSWER cameraTrack=' + (track ? track.id : 'null') + ' readyState=' + (track ? track.readyState : 'n/a') + ' enabled=' + (track ? track.enabled : 'n/a') + ' muted=' + (track ? track.muted : 'n/a') + ' transceiverDirection=' + (before.transceiver ? (before.transceiver.direction || 'n/a') + '/' + (before.transceiver.currentDirection || 'n/a') : 'none') + ' senderTrack=' + (before.senderTrack ? before.senderTrack.id : 'null') + ' sameCurrentTrack=' + before.sameCurrentTrack + ' ensured=' + ensured);
         await pc.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
         X.log.ice('REMOTE_OFFER_VIDEO_DIRECTION ' + X.ice.sdpVideoInfo(signal.sdp));
         await flushCandidates(pc);
         var answer = await pc.createAnswer();
-        var after = X.peer.verifyVideoTx('callee-after-createanswer');
         var dir = X.ice.sdpVideoDirection(answer.sdp);
-        X.log.peer('AFTER_CREATE_ANSWER direction=' + dir + ' senderTrack=' + (after.senderTrack ? after.senderTrack.id : 'null') + ' sameCurrentTrack=' + after.sameCurrentTrack + ' transceiver=' + (after.transceiver ? (after.transceiver.direction || 'n/a') + '/' + (after.transceiver.currentDirection || 'n/a') : 'none'));
         if (dir !== 'sendrecv' && track && track.readyState === 'live') {
-            X.log.warn('Peer', 'ANSWER_DIRECTION_WRONG expected=sendrecv actual=' + dir + ' senderTrack=' + (after.senderTrack ? after.senderTrack.id : 'null'));
+            X.log.warn('Peer', 'ANSWER_DIRECTION_WRONG expected=sendrecv actual=' + dir);
         }
         await pc.setLocalDescription(answer);
-        var afterLocal = X.peer.verifyVideoTx('callee-after-set-local-answer');
-        X.log.peer('AFTER_SET_LOCAL_ANSWER senderTrack=' + (afterLocal.senderTrack ? afterLocal.senderTrack.id : 'null') + ' currentDirection=' + (afterLocal.transceiver ? (afterLocal.transceiver.currentDirection || 'n/a') : 'none'));
         X.ice.sdpSummary('LOCAL_ANSWER', answer.sdp);
         X.log.ice('LOCAL_ANSWER_VIDEO_DIRECTION ' + X.ice.sdpVideoInfo(answer.sdp));
         X.log.ice('LOCAL_ANSWER_MSID=' + (X.ice.sdpHasMsid(answer.sdp) ? 'yes' : 'no'));
@@ -114,7 +101,6 @@
         X.log.ice('REMOTE_ANSWER_VIDEO_DIRECTION ' + X.ice.sdpVideoInfo(signal.sdp));
         await pc.setRemoteDescription({ type: 'answer', sdp: signal.sdp });
         X.log.signal('ANSWER_APPLIED');
-        X.peer.verifyVideoTx('caller-after-remote-answer');
         await flushCandidates(pc);
     }
 

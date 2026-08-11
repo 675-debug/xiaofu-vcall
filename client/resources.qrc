@@ -16,7 +16,6 @@
     </qresource>
     <qresource prefix="/video">
         <file alias="video_call.html">resources/video/video_call.html</file>
-        <file alias="audio_debug.js">resources/video/audio_debug.js</file>
         <file alias="video_call.js">resources/video/video_call.js</file>
         <file alias="webrtc/core.js">resources/video/webrtc/core.js</file>
         <file alias="webrtc/logger.js">resources/video/webrtc/logger.js</file>
@@ -25,7 +24,6 @@
         <file alias="webrtc/media.js">resources/video/webrtc/media.js</file>
         <file alias="webrtc/ice.js">resources/video/webrtc/ice.js</file>
         <file alias="webrtc/stats.js">resources/video/webrtc/stats.js</file>
-        <file alias="webrtc/probe.js">resources/video/webrtc/probe.js</file>
         <file alias="webrtc/subtitle.js">resources/video/webrtc/subtitle.js</file>
         <file alias="webrtc/peer.js">resources/video/webrtc/peer.js</file>
         <file alias="webrtc/ui.js">resources/video/webrtc/ui.js</file>

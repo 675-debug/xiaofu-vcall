@@ -86,7 +86,6 @@
                 var quality = networkQuality(rtt, videoLost, videoReceived);
                 X.log.stats('NETWORK_QUALITY reason=' + reason + ' rtt=' + (rtt >= 0 ? rtt + 'ms' : 'n/a') + ' lost=' + videoLost + ' received=' + videoReceived + ' quality=' + qualityText(quality));
             }
-            X.log.stats('PROBE_STATS reason=' + reason + ' frames=' + X.state.probeFrames + ' errors=' + X.state.probeErrors + ' hash=' + X.state.probeLastHash + ' source=' + X.state.probeLastWidth + 'x' + X.state.probeLastHeight + ' probeActive=' + X.state.probeActive);
         }).catch(function (error) {
             X.log.warn('Stats', 'GET_STATS_FAIL ' + error);
         });

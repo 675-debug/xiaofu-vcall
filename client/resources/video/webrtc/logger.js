@@ -14,7 +14,6 @@
         peer: make('Peer'),
         signal: make('Signal'),
         stats: make('Stats'),
-        probe: make('Probe'),
         bridge: make('Bridge'),
         state: make('State'),
         ui: make('UI'),

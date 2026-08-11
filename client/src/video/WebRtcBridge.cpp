@@ -134,20 +134,6 @@ void WebRtcBridge::applySubtitleUrl() {
         return;
     setSubtitleUrl(pendingSubtitleUrl);
 }
-
-
-void WebRtcBridge::setCameraProbeEnabled(bool enabled) {
-    pendingCameraProbeEnabled = enabled;
-    qDebug().noquote() << "[Call] camera probe enabled:" << (enabled ? QStringLiteral("true") : QStringLiteral("false"));
-    if (!page)
-        return;
-    runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.setCameraProbeEnabled(%1);")
-                      .arg(enabled ? QStringLiteral("true") : QStringLiteral("false")));
-}
-
-void WebRtcBridge::applyCameraProbeEnabled() {
-    setCameraProbeEnabled(pendingCameraProbeEnabled);
-}
 void WebRtcBridge::toggleScreenShare() {
     runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.screenToggle();"));
 }

@@ -30,8 +30,6 @@ public:
     void applyIcePolicy();
     // 配置候选诊断过滤模式：'ipv4-udp-host-only'/'no-ipv6'/'no-tcp'（诊断候选路径问题），空/其他值恢复默认。
     void setDiagFilter(const QString& mode);
-    void setCameraProbeEnabled(bool enabled);
-    void applyCameraProbeEnabled();
     // 页面加载完成后把 C++ 侧暂存的诊断过滤模式推送给 JS。
     void applyDiagFilter();
     // 实时字幕 FunASR WebSocket 服务地址，页面加载完成后注入 JS。
@@ -64,6 +62,5 @@ private:
     QString pendingIcePolicy;
     QString pendingDiagFilter;
     QString pendingSubtitleUrl;
-    bool pendingCameraProbeEnabled = false;
 };
 

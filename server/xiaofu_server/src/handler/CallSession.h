@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include <functional>
@@ -37,14 +37,10 @@ struct CallSession {
 
 class CallSessionManager {
 public:
-    using EndCallback = std::function<void(const std::string& callId,
-                                            const std::string& caller,
-                                            const std::string& callee)>;
     using PersistCallback = std::function<void(const CallSession& session)>;
-    void setEndCallback(EndCallback cb) { endCallback_ = std::move(cb); }
     void setPersistCallback(PersistCallback cb) { persistCallback_ = std::move(cb); }
 
-    // Create a new call session; returns nullptr if caller or callee is busy.
+    // Create a new call session. Busy enforcement is the caller's job: check isUserBusy() first.
     CallSession* create(const std::string& callId,
                         const std::string& caller, std::uint64_t callerConnId,
                         const std::string& callee, std::uint64_t calleeConnId,
@@ -83,27 +79,5 @@ public:
 
 private:
     std::map<std::string, CallSession> sessions_;  // callId → session
-    EndCallback endCallback_;
     PersistCallback persistCallback_;
-};
-
-// --------------- BusyTracker ---------------
-
-class BusyTracker {
-public:
-    void setBusy(const std::string& username, const std::string& callId) {
-        busy_[username] = callId;
-    }
-    void release(const std::string& username) {
-        busy_.erase(username);
-    }
-    bool isBusy(const std::string& username) const {
-        return busy_.count(username) > 0;
-    }
-    std::string callIdFor(const std::string& username) const {
-        auto it = busy_.find(username);
-        return it != busy_.end() ? it->second : std::string();
-    }
-private:
-    std::map<std::string, std::string> busy_;  // username → callId
 };

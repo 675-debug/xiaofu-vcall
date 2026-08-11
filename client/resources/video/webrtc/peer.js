@@ -10,75 +10,6 @@
         return X.state.callActive && X.state.peerConnection === pc && X.state.currentPcId === pcId && pc && pc.signalingState !== 'closed';
     }
 
-    async function attachLocalVideoTrack(pc, stream) {
-        if (!pc || !stream) return false;
-        var track = X.media.getVideoTrack(stream);
-        if (!track) return false;
-        var sender = getVideoSender();
-        if (sender) {
-            if (sender.track === track) {
-                X.log.peer('LOCAL_TRACK_ALREADY_ATTACHED');
-                return true;
-            }
-            if (typeof sender.replaceTrack === 'function') {
-                try {
-                    await sender.replaceTrack(track);
-                    X.log.peer('LOCAL_TRACK_ATTACHED_VIA_SENDER readyState=' + track.readyState + ' enabled=' + track.enabled);
-                    return true;
-                } catch (error) {
-                    X.log.warn('Peer', 'REPLACE_TRACK_ATTACH_FAIL ' + error);
-                    return false;
-                }
-            }
-        }
-        try {
-            pc.addTrack(track, stream);
-            var afterSenders = typeof pc.getSenders === 'function' ? pc.getSenders() : [];
-            for (var j = 0; j < afterSenders.length; j++) {
-                if (afterSenders[j].track === track) {
-                    X.state.videoSender = afterSenders[j];
-                    break;
-                }
-            }
-            X.media.logVideoTrack('LOCAL_TRACK_ADDED', track);
-            return true;
-        } catch (error) {
-            X.log.warn('Peer', 'ADD_VIDEO_TRACK_FAIL ' + error);
-            return false;
-        }
-    }
-
-    function ensureRecvOnlyVideo(pc) {
-        if (!pc) return;
-        if (X.state.videoTransceiver && X.state.videoSender) {
-            X.log.peer('VIDEO_TRANSCEIVER_SENDRECV_NULL_TRACK');
-            return;
-        }
-        if (typeof pc.getTransceivers === 'function') {
-            var transceivers = pc.getTransceivers();
-            for (var i = 0; i < transceivers.length; i++) {
-                var transceiver = transceivers[i];
-                var receiverTrack = transceiver.receiver && transceiver.receiver.track;
-                if (receiverTrack && receiverTrack.kind === 'video') {
-                    X.state.videoTransceiver = transceiver;
-                    X.state.videoSender = transceiver.sender;
-                    X.log.peer('VIDEO_TRANSCEIVER_SAVED track=' + (transceiver.sender && transceiver.sender.track ? 'live' : 'null'));
-                    return;
-                }
-            }
-        }
-        if (typeof pc.addTransceiver === 'function') {
-            try {
-                var created = pc.addTransceiver('video', { direction: 'sendrecv' });
-                X.state.videoTransceiver = created;
-                X.state.videoSender = created.sender;
-                X.log.peer('VIDEO_TRANSCEIVER_CREATED_SENDRECV track=null');
-            } catch (error) {
-                X.log.warn('Peer', 'ADD_TRANSCEIVER_FAIL ' + error);
-            }
-        }
-    }
-
     function transceiverDirectionText(transceiver) {
         if (!transceiver) return 'none';
         var dir = transceiver.direction || 'n/a';
@@ -154,21 +85,6 @@
             X.log.warn('Peer', 'ENSURE_VIDEO_SENDER_REPLACE_FAIL ' + error);
             return false;
         }
-    }
-
-    function verifyVideoTx(label) {
-        var sender = getVideoSender();
-        var transceiver = getVideoTransceiver();
-        var currentTrack = X.media.getVideoTrack(X.state.localStream);
-        var senderTrack = sender ? sender.track : null;
-        var same = !!(currentTrack && senderTrack === currentTrack);
-        X.log.peer('VIDEO_TX_VERIFY label=' + label + ' sender=' + (sender ? 'yes' : 'null') + ' senderTrack=' + (senderTrack ? senderTrack.readyState : 'null') + ' sameCurrentTrack=' + same + ' direction=' + transceiverDirectionText(transceiver) + ' localTrack=' + (currentTrack ? currentTrack.readyState : 'null') + ' cameraLastAction=' + X.state.cameraLastAction);
-        return {
-            sender: sender,
-            transceiver: transceiver,
-            senderTrack: senderTrack,
-            sameCurrentTrack: same
-        };
     }
 
     function attachRemotePreview(stream) {
@@ -275,7 +191,7 @@
         X.state.peerConnection = pc;
         X.state.videoTransceiver = null;
         X.state.videoSender = null;
-        X.log.peer('CREATE_PC pcId=#' + pcId + ' video=true audio=true icePolicy=relay hasTurn=' + (turnServers.length > 0) + ' turnOnly=true canvasProbe=local');
+        X.log.peer('CREATE_PC pcId=#' + pcId + ' video=true audio=true icePolicy=relay hasTurn=' + (turnServers.length > 0));
         X.log.peer('PC_STATE pcId=#' + pcId + ' ' + pcState(pc));
         setupVideoTransceiver(pc);
         setupAudioTransceiver(pc);
@@ -614,13 +530,10 @@
         pcState: pcState,
         isCurrentPc: isCurrentPc,
         createPeerConnection: createPeerConnection,
-        attachLocalVideoTrack: attachLocalVideoTrack,
-        ensureRecvOnlyVideo: ensureRecvOnlyVideo,
         attachRemotePreview: attachRemotePreview,
         getVideoSender: getVideoSender,
         getVideoTransceiver: getVideoTransceiver,
         ensureVideoSenderTrack: ensureVideoSenderTrack,
-        verifyVideoTx: verifyVideoTx,
         transceiverDirectionText: transceiverDirectionText,
         replaceVideoTrack: replaceVideoTrack,
         getVideoOutFrames: getVideoOutFrames,

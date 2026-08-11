@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -61,262 +60,6 @@ std::int64_t steadyNowMs() {
     return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }
 
-std::string clockMs() {
-    const auto now = std::chrono::steady_clock::now().time_since_epoch();
-    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    const auto sec = ms / 1000;
-    const auto msec = ms % 1000;
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%lld.%03lld",
-                  static_cast<long long>(sec), static_cast<long long>(msec));
-    return buf;
-}
-
-std::string pairKey(const std::string& a, const std::string& b) {
-    return a < b ? (a + "|" + b) : (b + "|" + a);
-}
-
-// --------------- ICE candidate field extraction ---------------
-
-struct IceFields {
-    std::string type = "?";
-    std::string protocol = "?";
-    std::string address = "?";
-    std::string port = "?";
-    std::string priority = "?";
-    std::string foundation = "?";
-    std::string ufrag;
-};
-
-IceFields parseIce(const std::string& candidateStr) {
-    IceFields f;
-    if (candidateStr.empty()) return f;
-    std::istringstream stream(candidateStr);
-    std::vector<std::string> tokens;
-    std::string t;
-    while (stream >> t) tokens.push_back(t);
-    if (tokens.empty()) return f;
-    const auto cp = tokens[0].find(':');
-    f.foundation = (cp != std::string::npos) ? tokens[0].substr(cp + 1) : tokens[0];
-    if (tokens.size() > 2) f.protocol = tokens[2];
-    if (tokens.size() > 3) f.priority = tokens[3];
-    if (tokens.size() > 4) f.address = tokens[4];
-    if (tokens.size() > 5) f.port = tokens[5];
-    for (size_t i = 0; i + 1 < tokens.size(); ++i) {
-        if (tokens[i] == "typ" && i + 1 < tokens.size()) f.type = tokens[i + 1];
-        if (tokens[i] == "ufrag" && i + 1 < tokens.size()) f.ufrag = tokens[i + 1];
-    }
-    return f;
-}
-
-// --------------- SDP diagnostic parser ---------------
-
-struct MediaSection {
-    bool present = false;
-    std::string mid;
-    int port = 0;
-    std::string direction;
-    std::string directionSource;  // explicit / session / default
-    std::string primaryCodec;
-    bool rtx = false;
-    bool red = false;
-    bool ulpfec = false;
-    std::string allCodecs;  // comma-separated all codec names found
-    bool msid = false;
-    bool ssrc = false;
-    int ssrcCount = 0;
-    bool rtcpMux = false;
-};
-
-struct SdpDiag {
-    int length = 0;
-    int mediaSections = 0;
-    MediaSection video;
-    MediaSection audio;
-    std::string fingerprintAlgo;
-    std::string fingerprintHash;
-    std::string ufrag;
-    std::string sessionDirection;  // session-level direction if set
-};
-
-SdpDiag parseSdpDiag(const std::string& sdp) {
-    SdpDiag d;
-    if (sdp.empty()) return d;
-    d.length = static_cast<int>(sdp.size());
-
-    std::istringstream stream(sdp);
-    std::string line;
-    MediaSection* cur = nullptr;
-    bool inVideo = false, inAudio = false;
-
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-
-        // session-level direction
-        if (line == "a=sendrecv" || line == "a=sendonly" ||
-            line == "a=recvonly" || line == "a=inactive") {
-            if (!cur) d.sessionDirection = line.substr(2);
-            else {
-                cur->direction = line.substr(2);
-                cur->directionSource = "explicit";
-            }
-            if (cur == &d.video) continue;
-            // fall through for audio too
-            if (cur) continue;
-        }
-
-        // media line
-        if (line.rfind("m=", 0) == 0) {
-            ++d.mediaSections;
-            inVideo = false; inAudio = false;
-            if (line.rfind("m=video", 0) == 0) {
-                inVideo = true; cur = &d.video; d.video.present = true;
-                // parse port: m=video 9 UDP/TLS/RTP/SAVPF ...
-                std::istringstream ml(line.substr(7));
-                ml >> d.video.port;
-            } else if (line.rfind("m=audio", 0) == 0) {
-                inAudio = true; cur = &d.audio; d.audio.present = true;
-                std::istringstream ml(line.substr(7));
-                ml >> d.audio.port;
-            } else {
-                cur = nullptr;
-            }
-            continue;
-        }
-
-        // mid
-        if (line.rfind("a=mid:", 0) == 0) {
-            if (inVideo) d.video.mid = line.substr(6);
-            else if (inAudio) d.audio.mid = line.substr(6);
-            continue;
-        }
-
-        // direction in media section
-        if (line == "a=sendrecv" || line == "a=sendonly" ||
-            line == "a=recvonly" || line == "a=inactive") {
-            if (inVideo) { d.video.direction = line.substr(2); d.video.directionSource = "explicit"; }
-            else if (inAudio) { d.audio.direction = line.substr(2); d.audio.directionSource = "explicit"; }
-            continue;
-        }
-
-        // rtpmap / codec
-        if (line.rfind("a=rtpmap:", 0) == 0 && cur) {
-            const auto sp = line.find(' ');
-            if (sp != std::string::npos) {
-                const std::string rest = line.substr(sp + 1);
-                const auto sl = rest.find('/');
-                if (sl != std::string::npos) {
-                    std::string c = rest.substr(0, sl);
-                    // Distinguish primary codec from auxiliary payload types
-                    bool isAux = false;
-                    if (c == "rtx" || c == "RTX")      { cur->rtx = true; isAux = true; }
-                    else if (c == "red" || c == "RED")  { cur->red = true; isAux = true; }
-                    else if (c == "ulpfec" || c == "ULPFEC") { cur->ulpfec = true; isAux = true; }
-                    else if (c == "flexfec" || c == "FLEXFEC") isAux = true;
-                    // Normalize primary codec name
-                    if      (c == "vp8"  || c == "VP8")  c = "VP8";
-                    else if (c == "vp9"  || c == "VP9")  c = "VP9";
-                    else if (c == "h264" || c == "H264") c = "H264";
-                    else if (c == "h265" || c == "H265") c = "H265";
-                    else if (c == "av1"  || c == "AV1")  c = "AV1";
-                    else if (c == "opus") c = "opus";
-                    else if (c == "pcma" || c == "PCMA") c = "PCMA";
-                    else if (c == "pcmu" || c == "PCMU") c = "PCMU";
-                    if (!isAux && cur->primaryCodec.empty())
-                        cur->primaryCodec = c;
-                    if (!cur->allCodecs.empty()) cur->allCodecs += ",";
-                    cur->allCodecs += c;
-                }
-            }
-            continue;
-        }
-
-        // msid
-        if (line.rfind("a=msid", 0) == 0) {
-            if (cur) cur->msid = true;
-            continue;
-        }
-
-        // ssrc
-        if (line.rfind("a=ssrc:", 0) == 0) {
-            if (cur) { cur->ssrc = true; ++cur->ssrcCount; }
-            continue;
-        }
-
-        // rtcp-mux
-        if (line.rfind("a=rtcp-mux", 0) == 0) {
-            if (inVideo) d.video.rtcpMux = true;
-            else if (inAudio) d.audio.rtcpMux = true;
-            continue;
-        }
-
-        // fingerprint
-        if (line.rfind("a=fingerprint:", 0) == 0) {
-            const std::string fp = line.substr(15);
-            const auto spacePos = fp.find(' ');
-            if (spacePos != std::string::npos) {
-                d.fingerprintAlgo = fp.substr(0, spacePos);
-                d.fingerprintHash = fp.substr(spacePos + 1);
-            } else {
-                d.fingerprintAlgo = fp;
-            }
-            continue;
-        }
-
-        // ice-ufrag
-        if (line.rfind("a=ice-ufrag:", 0) == 0) {
-            d.ufrag = line.substr(12);
-            continue;
-        }
-    }
-
-    // Fill default directions
-    for (MediaSection* ms : {&d.video, &d.audio}) {
-        if (!ms->present) continue;
-        if (ms->direction.empty()) {
-            if (!d.sessionDirection.empty()) {
-                ms->direction = d.sessionDirection;
-                ms->directionSource = "session";
-            } else {
-                ms->direction = "sendrecv";
-                ms->directionSource = "default";
-            }
-        }
-    }
-
-    return d;
-}
-
-std::string trimFingerprint(const std::string& s) {
-    return s.size() > 24 ? s.substr(0, 24) + "..." : s;
-}
-
-std::string describeMedia(const MediaSection& m, const std::string& label) {
-    if (!m.present) return "";
-    std::ostringstream out;
-    out << label << ": mid=" << (m.mid.empty() ? "?" : m.mid)
-        << " port=" << m.port
-        << " dir=" << m.direction << "(" << m.directionSource << ")"
-        << " codec=" << (m.primaryCodec.empty() ? "?" : m.primaryCodec)
-        << " msid=" << (m.msid ? "yes" : "no")
-        << " ssrc=" << (m.ssrc ? "yes" : "no")
-        << "(" << m.ssrcCount << ")"
-        << " rtcp_mux=" << (m.rtcpMux ? "yes" : "no");
-    // auxiliary payloads
-    if (m.rtx || m.red || m.ulpfec) {
-        out << " aux=";
-        std::vector<std::string> aux;
-        if (m.rtx) aux.push_back("rtx");
-        if (m.red) aux.push_back("red");
-        if (m.ulpfec) aux.push_back("ulpfec");
-        for (size_t i = 0; i < aux.size(); ++i) {
-            if (i) out << ",";
-            out << aux[i];
-        }
-    }
-    return out.str();
-}
-
 } // anonymous namespace
 
 // ============================================================
@@ -331,12 +74,6 @@ ServerApp::ServerApp(std::string databasePath, std::size_t workerCount)
           removeConnection(fd);
       })
 {
-    callManager.setEndCallback([this](const std::string& callId,
-                                       const std::string& caller,
-                                       const std::string& callee) {
-        busyTracker.release(caller);
-        busyTracker.release(callee);
-    });
     callManager.setPersistCallback([this](const CallSession& session) {
         persistCallRecord(session);
     });
@@ -475,8 +212,6 @@ void ServerApp::removeConnection(int fd)
             const CallSession* cs = callManager.findByCallId(cid);
             if (!cs) continue;
             const std::string peer = cs->otherUser(username);
-            busyTracker.release(username);
-            busyTracker.release(peer);
 
             Log::info("[CALL " + cid + "][CLEANUP] reason=PEER_DISCONNECTED"
                       + std::string(" state=ended user=") + username
@@ -601,12 +336,6 @@ std::string ServerApp::callIdForPair(const std::string& userA, const std::string
     return userA + "-" + userB;
 }
 
-std::string ServerApp::findActiveCallForUser(const std::string& username) const
-{
-    const CallSession* cs = callManager.findActiveForUser(username);
-    return cs ? cs->callId : std::string();
-}
-
 void ServerApp::cleanupCallsForUser(const std::string& username, std::int64_t nowMs,
                                      const std::string& reason)
 {
@@ -615,8 +344,6 @@ void ServerApp::cleanupCallsForUser(const std::string& username, std::int64_t no
         const CallSession* cs = callManager.findByCallId(cid);
         if (!cs) continue;
         const std::string peer = cs->otherUser(username);
-        busyTracker.release(username);
-        busyTracker.release(peer);
         Log::info("[CALL " + cid + "][CLEANUP] reason=" + reason
                   + " user=" + username + " peer=" + peer);
 
@@ -668,8 +395,6 @@ void ServerApp::checkRingingTimeouts(std::int64_t nowMs)
         Log::info("[CALL " + cid + "][TIMEOUT] ringing timeout  generation="
                   + std::to_string(cs->generation));
         callManager.end(cid, "timeout", nowMs);
-        busyTracker.release(cs->caller);
-        busyTracker.release(cs->callee);
 
         // notify caller
         const int callerFd = joinHandler.fdOf(cs->caller);
@@ -720,60 +445,6 @@ ServerApp::SignalResult ServerApp::validateCallSignal(
         return SignalResult::WrongState;
 
     return SignalResult::Ok;
-}
-
-// ============================================================
-//  SDP diagnostics
-// ============================================================
-
-void ServerApp::logSdpDiag(const std::string& callId, const std::string& signalType,
-                            const std::string& sender, const std::string& receiver,
-                            const std::string& sdp)
-{
-    const auto d = parseSdpDiag(sdp);
-    const std::string ts = clockMs();
-
-    Log::debug("--- [CALL " + callId + "][" + signalType + "] [" + ts + "] ---");
-    Log::debug("  sender=" + sender + " -> receiver=" + receiver);
-    Log::debug("  SDP len=" + std::to_string(d.length)
-               + " media_sections=" + std::to_string(d.mediaSections));
-
-    std::string videoInfo = describeMedia(d.video, "VIDEO");
-    std::string audioInfo = describeMedia(d.audio, "AUDIO");
-
-    if (!videoInfo.empty()) Log::debug("  " + videoInfo);
-    if (!audioInfo.empty()) Log::debug("  " + audioInfo);
-
-    if (!d.fingerprintAlgo.empty())
-        Log::debug("  DTLS fp=" + d.fingerprintAlgo + " " + trimFingerprint(d.fingerprintHash));
-    if (!d.ufrag.empty()) {
-        Log::debug("  ICE ufrag=" + d.ufrag);
-        callUfrags_[callId] = d.ufrag;
-    }
-}
-
-// ============================================================
-//  ICE diagnostics
-// ============================================================
-
-void ServerApp::logIceDiag(const std::string& callId,
-                            const std::string& sender, const std::string& receiver,
-                            const std::string& candidateStr,
-                            const CallSession* session)
-{
-    const IceFields ice = parseIce(candidateStr);
-    const std::string ts = clockMs();
-    const std::string state = session ? session->state : "?";
-
-    Log::debug("--- [CALL " + callId + "][ICE] [" + ts + "] ---");
-    Log::debug("  from=" + sender + " -> to=" + receiver + " callState=" + state);
-    Log::debug("  candidate: type=" + ice.type
-               + " proto=" + ice.protocol
-               + " ip=" + ice.address
-               + " port=" + ice.port
-               + " prio=" + ice.priority
-               + " foundation=" + ice.foundation
-               + (ice.ufrag.empty() ? "" : " ufrag=" + ice.ufrag));
 }
 
 // ============================================================
@@ -852,21 +523,6 @@ void ServerApp::handleCallHistory(std::uint64_t connectionId, const std::string&
             });
         })) return;
     sendTo(connectionId, makeResponse("call_history_resp", ResultCode::Failed, "server is stopping"));
-}
-
-// ============================================================
-//  FD tracking
-// ============================================================
-
-void ServerApp::trackFdForUser(const std::string& username, int fd) {
-    // fd tracking is now handled via connectionId in CallSession
-    (void)username;
-    (void)fd;
-}
-
-void ServerApp::checkFdStability(const std::string& user, int fd) {
-    (void)user;
-    (void)fd;
 }
 
 // ============================================================
@@ -1262,14 +918,14 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
         // --- call_request: create session ---
         if (type == "call_request") {
             // check busy
-            if (busyTracker.isBusy(currentUsername)) {
+            if (callManager.isUserBusy(currentUsername)) {
                 Log::debug("[CALL ?][SIGNAL] call_request from=" + currentUsername
                           + " IGNORED reason=caller_busy");
                 sendTo(connectionId, makeResponse("call_signal_resp", ResultCode::Failed,
                                                    "caller is busy"));
                 return;
             }
-            if (busyTracker.isBusy(receiver)) {
+            if (callManager.isUserBusy(receiver)) {
                 Log::debug("[CALL ?][SIGNAL] call_request to=" + receiver
                           + " IGNORED reason=callee_busy");
                 sendTo(connectionId, makeResponse("call_signal_resp", ResultCode::UserBusy,
@@ -1292,9 +948,6 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
                                                    "cannot create call"));
                 return;
             }
-            busyTracker.setBusy(currentUsername, newCallId);
-            busyTracker.setBusy(receiver, newCallId);
-
             Log::info("=== NEW CALL SESSION ===");
             Log::info("[CALL " + newCallId + "] caller=" + currentUsername
                       + " connId=" + std::to_string(connectionId)
@@ -1365,8 +1018,6 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
             // Atomic: ringing → connecting, cancel ringing timeout.
             // Idempotent: duplicate accept on already-connecting returns false (safe).
             callManager.accept(callId, now);
-            busyTracker.setBusy(currentUsername, callId);
-            busyTracker.setBusy(receiver, callId);
             // Re-read state after transition
             const CallSession* updated = callManager.findByCallId(callId);
             Log::info("[CALL " + callId + "][SIGNAL] call_accept from=" + currentUsername
@@ -1378,24 +1029,18 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
 
         if (type == "call_reject") {
             callManager.end(callId, "rejected", now);
-            busyTracker.release(currentUsername);
-            busyTracker.release(receiver);
             Log::info("[CALL " + callId + "][SIGNAL] call_reject from=" + currentUsername
                       + " to=" + receiver + " state=ended forwarded=yes");
         }
 
         if (type == "call_cancel") {
             callManager.end(callId, "cancelled", now);
-            busyTracker.release(currentUsername);
-            busyTracker.release(receiver);
             Log::info("[CALL " + callId + "][SIGNAL] call_cancel from=" + currentUsername
                       + " to=" + receiver + " state=ended forwarded=yes");
         }
 
         if (type == "call_hangup") {
             callManager.end(callId, "completed", now);
-            busyTracker.release(currentUsername);
-            busyTracker.release(receiver);
             Log::info("[CALL " + callId + "][SIGNAL] call_hangup from=" + currentUsername
                       + " to=" + receiver + " state=ended forwarded=yes");
         }
@@ -1403,20 +1048,16 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
         if (type == "webrtc_offer") {
             Log::info("[CALL " + callId + "][SIGNAL] webrtc_offer from=" + currentUsername
                       + " to=" + receiver + " state=" + state + " forwarded=yes");
-            logSdpDiag(callId, "SDP OFFER", currentUsername, receiver,
-                       request.get("sdp").asString());
         }
 
         if (type == "webrtc_answer") {
             Log::info("[CALL " + callId + "][SIGNAL] webrtc_answer from=" + currentUsername
                       + " to=" + receiver + " state=" + state + " forwarded=yes");
-            logSdpDiag(callId, "SDP ANSWER", currentUsername, receiver,
-                       request.get("sdp").asString());
         }
 
         if (type == "ice_candidate") {
-            logIceDiag(callId, currentUsername, receiver,
-                       request.get("candidate").asString(), session);
+            Log::info("[CALL " + callId + "][SIGNAL] ice_candidate from=" + currentUsername
+                      + " to=" + receiver);
         }
 
         // --- relay response ---

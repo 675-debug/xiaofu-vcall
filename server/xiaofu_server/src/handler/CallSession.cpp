@@ -60,8 +60,6 @@ bool CallSessionManager::end(const std::string& callId, const std::string& reaso
               + " caller=" + it->second.caller
               + " callee=" + it->second.callee
               + " duration=" + std::to_string(it->second.endedAt - it->second.createdAt) + "ms");
-    if (endCallback_)
-        endCallback_(callId, it->second.caller, it->second.callee);
     if (persistCallback_)
         persistCallback_(it->second);
     return true;

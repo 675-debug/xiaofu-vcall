@@ -380,9 +380,6 @@ void CallWidget::setupWebRtcView() {
     qDebug().noquote() << "[Call] XIAOFU_DIAG_CAND_FILTER ="
                        << (diagFilter.isEmpty() ? QStringLiteral("(none, default)") : diagFilter);
     webRtcBridge->setDiagFilter(diagFilter);
-    const bool cameraProbe = qEnvironmentVariableIntValue("XIAOFU_CAMERA_PROBE") == 1;
-    qDebug().noquote() << "[Call] XIAOFU_CAMERA_PROBE =" << (cameraProbe ? 1 : 0);
-    webRtcBridge->setCameraProbeEnabled(cameraProbe);
     const QString asrUrl = asrUrlFromEnv();
     qDebug().noquote() << "[Call] XIAOFU_ASR_URL =" << asrUrl;
     webRtcBridge->setSubtitleUrl(asrUrl);
@@ -426,7 +423,6 @@ void CallWidget::setupWebRtcView() {
         webRtcBridge->applyIceServers();
         webRtcBridge->applyIcePolicy();
         webRtcBridge->applyDiagFilter();
-        webRtcBridge->applyCameraProbeEnabled();
         webRtcBridge->applySubtitleUrl();
         if (ui->callStack->currentIndex() == 1)
             webRtcBridge->startPreview();

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 project(xiaofu-server CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -96,3 +96,9 @@ endif()
 add_executable(db_check tools/db_check.cpp)
 target_include_directories(db_check PRIVATE ${SQLITE_INCLUDE_DIR})
 target_link_libraries(db_check PRIVATE ${SQLITE_LIBRARY_TARGET})
+
+add_executable(call_session_test
+    tools/call_session_test.cpp
+    src/handler/CallSession.cpp
+    src/util/Log.cpp)
+target_include_directories(call_session_test PRIVATE src)

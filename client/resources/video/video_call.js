@@ -3,7 +3,7 @@
 
     var BUILD = '2026-08-08-r11-call-reliability-ux';
 
-    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'probe', 'peer', 'signal', 'ui', 'screen', 'recorder', 'subtitle'];
+    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'peer', 'signal', 'ui', 'screen', 'recorder', 'subtitle'];
     var missing = [];
     for (var i = 0; i < required.length; i++) {
         if (typeof window.Xiaofu === 'undefined' || !window.Xiaofu[required[i]]) {
@@ -55,7 +55,6 @@
         X.state.outgoingOfferStarted = false;
         X.state.previewPromise = null;
         X.stats.stopStats();
-        X.probe.stopProbe();
         X.recorder.stop();
         X.subtitle.stop();
         X.ui.setSubtitleState(false);
@@ -95,13 +94,6 @@
         });
     }
 
-    function setCameraProbeEnabled(enabled) {
-        X.state.cameraProbeEnabled = !!enabled;
-        X.log.call('CAMERA_PROBE_ENABLED=' + X.state.cameraProbeEnabled);
-        if (X.state.cameraProbeEnabled && X.media.getVideoTrack(X.state.localStream)) {
-            X.probe.startProbe();
-        }
-    }
     function setIceServers(servers) {
         X.ice.setIceServers(servers);
     }
@@ -264,7 +256,6 @@
         X.media.logVideoTrack('MANUAL_LOCAL_VIDEO', track);
         var remoteVideo = X.dom.remoteVideo;
         X.log.call('MANUAL_REMOTE_VIDEO readyState=' + (remoteVideo ? remoteVideo.readyState : 'n/a') + ' videoWidth=' + (remoteVideo ? remoteVideo.videoWidth : 0) + ' videoHeight=' + (remoteVideo ? remoteVideo.videoHeight : 0));
-        X.log.call('MANUAL_PROBE frames=' + X.state.probeFrames + ' errors=' + X.state.probeErrors + ' hash=' + X.state.probeLastHash + ' source=' + X.state.probeLastWidth + 'x' + X.state.probeLastHeight + ' probeActive=' + X.state.probeActive);
         X.stats.dumpStats('manual');
     }
 
@@ -280,7 +271,6 @@
             audio: true,
             icePolicy: 'relay',
             turnOnly: true,
-            canvasProbe: 'local',
             cameraProfile: X.media.getCurrentCameraProfile(),
             cameraGeneration: X.state.cameraGeneration,
             hasTurn: X.ice.hasTurnServer(),
@@ -299,14 +289,6 @@
                 videoWidth: remoteVideo.videoWidth,
                 videoHeight: remoteVideo.videoHeight
             } : null,
-            canvas: {
-                frames: X.state.probeFrames,
-                errors: X.state.probeErrors,
-                hash: X.state.probeLastHash,
-                width: X.state.probeLastWidth,
-                height: X.state.probeLastHeight,
-                active: X.state.probeActive
-            },
             screen: screenState,
             recorder: recorderState,
             pip: {
@@ -350,7 +332,6 @@
         setIceServers: setIceServers,
         setIcePolicy: setIcePolicy,
         setDiagFilter: setDiagFilter,
-        setCameraProbeEnabled: setCameraProbeEnabled,
         setDiagMaxDumps: setDiagMaxDumps,
         setSubtitleUrl: setSubtitleUrl,
         screenToggle: screenToggle,
@@ -373,5 +354,5 @@
     bindFeatureButtons();
 
     X.log.call('R11_READY build=' + BUILD);
-    X.log.call('DIAG_CONFIG video=true audio=true width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true canvasProbe=local cameraProfile=vga build=' + BUILD);
+    X.log.call('DIAG_CONFIG video=true audio=true width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true cameraProfile=vga build=' + BUILD);
 }());

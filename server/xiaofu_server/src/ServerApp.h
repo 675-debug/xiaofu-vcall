@@ -8,7 +8,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -46,7 +45,6 @@ private:
     // --------------- CallSession management ---------------
     std::string generateCallId();
     std::string callIdForPair(const std::string& userA, const std::string& userB);
-    std::string findActiveCallForUser(const std::string& username) const;
 
     // Cleanup all calls for a disconnected user. Notifies peer if still online.
     void cleanupCallsForUser(const std::string& username, std::int64_t nowMs,
@@ -74,26 +72,11 @@ private:
                                     const std::string& to,
                                     const CallSession* session);
 
-    // --------------- SDP diagnostics ---------------
-    void logSdpDiag(const std::string& callId, const std::string& signalType,
-                    const std::string& sender, const std::string& receiver,
-                    const std::string& sdp);
-
-    // --------------- ICE logging ---------------
-    void logIceDiag(const std::string& callId,
-                    const std::string& sender, const std::string& receiver,
-                    const std::string& candidateStr,
-                    const CallSession* session);
-
     // --------------- Call history ---------------
     void persistCallRecord(const CallSession& session);
     void handleCallConnected(std::uint64_t connectionId, const std::string& callId,
                              std::int64_t nowMs);
     void handleCallHistory(std::uint64_t connectionId, const std::string& username);
-
-    // --------------- FD tracking ---------------
-    void trackFdForUser(const std::string& username, int fd);
-    void checkFdStability(const std::string& user, int fd);
 
     // --------------- Data ---------------
     std::string databasePath;
@@ -105,7 +88,6 @@ private:
     std::unique_ptr<HeartbeatManager> heartbeatManager;
     JoinHandler joinHandler;
     CallSessionManager callManager;
-    BusyTracker busyTracker;
     std::unordered_map<int, std::unique_ptr<Connection>> connections;
     std::unordered_map<std::uint64_t, int> fdByConnectionId;
     std::uint64_t nextConnectionId = 1;
@@ -114,6 +96,4 @@ private:
     // call session id sequence
     int nextCallSeq = 1;
 
-    // debug: ice ufrag tracking per callId
-    std::map<std::string, std::string> callUfrags_;
 };
