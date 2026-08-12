@@ -24,7 +24,7 @@ public:
     void setIceServers(const QVariantList& servers);
     // 页面加载完成后把 C++ 侧暂存的 ICE 配置推送给 JS。
     void applyIceServers();
-    // 配置 ICE 传输策略：'relay' 强制所有媒体走 TURN 中继（诊断直连路径问题），空/其他值恢复默认。
+    // 配置 ICE 传输策略：'relay' 强制所有媒体走 TURN 中继（诊断直连路径问题），'all'/空 使用标准 ICE（P2P/STUN 优先，TURN 兜底）。
     void setIcePolicy(const QString& policy);
     // 页面加载完成后把 C++ 侧暂存的 ICE 策略推送给 JS。
     void applyIcePolicy();
@@ -36,9 +36,10 @@ public:
     void setSubtitleUrl(const QString& url);
     // 页面加载完成后把 C++ 侧暂存的字幕服务地址推送给 JS。
     void applySubtitleUrl();
-    // R10：屏幕共享/录制的 UI foundation 开关，仅驱动 JS 能力探测与基础状态，不真正采集/保存。
-    void toggleScreenShare();
+    // R10：录屏 UI foundation 开关，仅驱动 JS 能力探测与基础状态，不真正采集/保存。
     void toggleRecording();
+    // 页面内轻量提示（toast），用于录屏保存位置等非阻塞通知。
+    void showToast(const QString& message);
 
 public slots:
     void requestHangup();

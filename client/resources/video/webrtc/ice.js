@@ -42,22 +42,44 @@
         return (servers || []).map(safeServer);
     }
 
+    function iceServerTypes() {
+        var types = [];
+        X.state.iceServers.forEach(function (server) {
+            var urls = normalizeUrls(server);
+            urls.forEach(function (url) {
+                var t = /^turns?:/i.test(X.text(url)) ? 'turn' : (/^stuns?:/i.test(X.text(url)) ? 'stun' : 'other');
+                if (types.indexOf(t) < 0) types.push(t);
+            });
+        });
+        return types;
+    }
+
     function setIceServers(servers) {
         X.state.iceServers = Array.isArray(servers) ? servers.slice() : [];
         X.log.ice('ICE_SERVERS ' + JSON.stringify(safeIceServers(X.state.iceServers)));
+        X.log.ice('ICE_SERVER_TYPES ' + iceServerTypes().join(','));
         var turnServers = getTurnIceServers();
         if (!turnServers.length) {
-            X.log.warn('ICE', 'TURN_CONFIG_MISSING relay policy requires TURN');
-            X.setEmpty('TURN unavailable');
+            if (X.state.iceTransportPolicy === 'relay') {
+                X.log.warn('ICE', 'TURN_CONFIG_MISSING relay policy requires TURN');
+                X.setEmpty('TURN unavailable');
+            } else {
+                X.log.warn('ICE', 'TURN_FALLBACK_UNAVAILABLE no turn server, STUN/P2P only');
+            }
             return;
         }
         X.log.ice('TURN_CONFIG_OK count=' + turnServers.length);
         X.log.ice('TURN_ONLY_SERVERS ' + JSON.stringify(safeIceServers(turnServers)));
     }
 
-    function setIcePolicy() {
-        X.state.iceTransportPolicy = 'relay';
-        X.log.ice('ICE_POLICY=relay');
+    function setIcePolicy(policy) {
+        var p = X.text(policy).trim().toLowerCase();
+        if (p === 'relay') {
+            X.state.iceTransportPolicy = 'relay';
+        } else {
+            X.state.iceTransportPolicy = 'all';
+        }
+        X.log.ice('ICE_POLICY=' + X.state.iceTransportPolicy);
     }
 
     function setDiagFilter() {
@@ -179,6 +201,7 @@
         normalizeUrls: normalizeUrls,
         isTurnUrl: isTurnUrl,
         getTurnIceServers: getTurnIceServers,
+        iceServerTypes: iceServerTypes,
         hasTurnServer: hasTurnServer,
         safeServer: safeServer,
         safeIceServers: safeIceServers,

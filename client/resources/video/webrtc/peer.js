@@ -176,22 +176,26 @@
         if (X.state.peerConnection && X.state.peerConnection.signalingState !== 'closed') {
             return X.state.peerConnection;
         }
+        var iceServers = X.state.iceServers || [];
+        var icePolicy = X.state.iceTransportPolicy || 'all';
         var turnServers = X.ice.getTurnIceServers();
-        if (!turnServers.length) {
-            X.log.warn('Peer', 'TURN_CONFIG_MISSING_CREATE_PC');
+        if (!turnServers.length && icePolicy === 'relay') {
+            X.log.warn('Peer', 'TURN_CONFIG_MISSING_CREATE_PC relay policy requires TURN');
+        } else if (!turnServers.length) {
+            X.log.warn('Peer', 'TURN_FALLBACK_UNAVAILABLE STUN/P2P only');
         }
         X.state.pcSeq++;
         X.state.currentPcId = X.state.pcSeq;
         var pcId = X.state.currentPcId;
         var pc = new RTCPeerConnection({
-            iceServers: turnServers,
-            iceTransportPolicy: 'relay',
+            iceServers: iceServers,
+            iceTransportPolicy: icePolicy,
             sdpSemantics: 'unified-plan'
         });
         X.state.peerConnection = pc;
         X.state.videoTransceiver = null;
         X.state.videoSender = null;
-        X.log.peer('CREATE_PC pcId=#' + pcId + ' video=true audio=true icePolicy=relay hasTurn=' + (turnServers.length > 0));
+        X.log.peer('CREATE_PC pcId=#' + pcId + ' video=true audio=true icePolicy=' + icePolicy + ' hasTurn=' + (turnServers.length > 0) + ' iceServerTypes=' + (X.ice.iceServerTypes ? X.ice.iceServerTypes().join(',') : '?'));
         X.log.peer('PC_STATE pcId=#' + pcId + ' ' + pcState(pc));
         setupVideoTransceiver(pc);
         setupAudioTransceiver(pc);

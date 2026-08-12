@@ -3,7 +3,7 @@
 
     var BUILD = '2026-08-08-r11-call-reliability-ux';
 
-    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'peer', 'signal', 'ui', 'screen', 'recorder', 'subtitle'];
+    var required = ['core', 'log', 'state', 'bridge', 'media', 'ice', 'stats', 'peer', 'signal', 'ui', 'recorder', 'subtitle'];
     var missing = [];
     for (var i = 0; i < required.length; i++) {
         if (typeof window.Xiaofu === 'undefined' || !window.Xiaofu[required[i]]) {
@@ -60,10 +60,8 @@
         X.ui.setSubtitleState(false);
         X.peer.closePc();
         X.state.pendingCandidates = [];
-        X.screen.stop();
         X.media.stopLocalStream();
         X.media.stopLocalAudio('stop-call');
-        X.ui.setScreenShareState(false);
         X.ui.setRecordingState(false);
         var remoteVideo = X.dom.remoteVideo;
         if (remoteVideo) {
@@ -98,8 +96,8 @@
         X.ice.setIceServers(servers);
     }
 
-    function setIcePolicy() {
-        X.ice.setIcePolicy();
+    function setIcePolicy(policy) {
+        X.ice.setIcePolicy(policy);
     }
 
     function setDiagFilter() {
@@ -108,22 +106,6 @@
 
     function setDiagMaxDumps(value) {
         X.stats.setDiagMaxDumps(value);
-    }
-
-    function screenToggle() {
-        if (!X.screen.isSupported()) {
-            X.log.warn('Call', 'SCREEN_SHARE_UNSUPPORTED_CLICK');
-            if (X.ui.showToast) X.ui.showToast('当前版本暂不支持屏幕共享');
-            return;
-        }
-        if (X.state.screen.active) {
-            X.screen.stop();
-            X.ui.setScreenShareState(false);
-            return;
-        }
-        X.screen.start().catch(function (error) {
-            warn('SCREEN_START_FAIL ' + error);
-        });
     }
 
     function recorderToggle() {
@@ -226,10 +208,6 @@
                 }
             });
         }
-        var shareButton = document.getElementById('share-button');
-        if (shareButton) {
-            shareButton.addEventListener('click', screenToggle);
-        }
         var recordButton = document.getElementById('record-button');
         if (recordButton) {
             recordButton.addEventListener('click', recorderToggle);
@@ -243,6 +221,7 @@
         var subtitleButton = document.getElementById('subtitle-button');
         if (subtitleButton) {
             subtitleButton.addEventListener('click', function () {
+                X.log.call('SUBTITLE_BUTTON');
                 X.subtitle.toggle();
                 X.ui.setSubtitleState(X.subtitle.isEnabled());
                 X.log.call('SUBTITLE_TOGGLE enabled=' + X.subtitle.isEnabled());
@@ -263,14 +242,12 @@
         var track = X.media.getVideoTrack(X.state.localStream);
         var settings = X.media.videoTrackSettings(track);
         var remoteVideo = X.dom.remoteVideo;
-        var screenState = X.screen.getState();
         var recorderState = X.recorder.getState();
         return {
             build: BUILD,
             video: true,
             audio: true,
-            icePolicy: 'relay',
-            turnOnly: true,
+            icePolicy: X.state.iceTransportPolicy || 'all',
             cameraProfile: X.media.getCurrentCameraProfile(),
             cameraGeneration: X.state.cameraGeneration,
             hasTurn: X.ice.hasTurnServer(),
@@ -289,7 +266,6 @@
                 videoWidth: remoteVideo.videoWidth,
                 videoHeight: remoteVideo.videoHeight
             } : null,
-            screen: screenState,
             recorder: recorderState,
             pip: {
                 moved: X.state.ui.pipMoved,
@@ -308,12 +284,9 @@
     }
 
     function getFeatureState() {
-        var screenState = X.screen.getState();
         var recorderState = X.recorder.getState();
         return {
             build: BUILD,
-            screenShareSupported: screenState.supported,
-            screenShareActive: screenState.active,
             mediaRecorderSupported: recorderState.supported,
             mediaRecorderMimeType: recorderState.mimeType,
             pipDraggable: !!(X.dom.localVideo && X.dom.callStage)
@@ -334,8 +307,10 @@
         setDiagFilter: setDiagFilter,
         setDiagMaxDumps: setDiagMaxDumps,
         setSubtitleUrl: setSubtitleUrl,
-        screenToggle: screenToggle,
         recorderToggle: recorderToggle,
+        showToast: function (message) {
+            if (X.ui && X.ui.showToast) X.ui.showToast(message);
+        },
         diagnose: diagnose,
         getDiagState: getDiagState,
         getFeatureState: getFeatureState
@@ -346,13 +321,9 @@
     X.media.init();
     X.ui.init();
     X.ui.buildCameraProfileBar();
-    X.screen.init();
     X.recorder.init();
-    if (!X.screen.isSupported() && X.ui.setScreenShareUnsupported) {
-        X.ui.setScreenShareUnsupported(true);
-    }
     bindFeatureButtons();
 
     X.log.call('R11_READY build=' + BUILD);
-    X.log.call('DIAG_CONFIG video=true audio=true width=640 height=480 maxFps=30 icePolicy=relay turnOnly=true cameraProfile=vga build=' + BUILD);
+    X.log.call('DIAG_CONFIG video=true audio=true width=640 height=480 maxFps=30 icePolicy=' + (X.state.iceTransportPolicy || 'all') + ' cameraProfile=vga build=' + BUILD);
 }());

@@ -41,9 +41,11 @@ add_executable(xiaofu-vcall-client WIN32
     src/ForgotPasswordWidget.h
     src/ChatWidget.h
     src/CallWidget.h
+    src/RecordingPaths.h
     src/video/WebRtcBridge.h
     src/video/VideoCallController.h
     src/network/NetworkManager.h
+    src/network/ProtocolCodes.h
     ui/MainWindow.ui
     ui/MainWidget.ui
     ui/LoginWidget.ui
@@ -66,4 +68,9 @@ target_link_libraries(xiaofu-vcall-client PRIVATE
 )
 if(QT_VERSION_MAJOR LESS 6)
     target_link_libraries(xiaofu-vcall-client PRIVATE Qt${QT_VERSION_MAJOR}::Multimedia)
+endif()
+
+# Windows exe icon resource
+if(WIN32)
+    target_sources(xiaofu-vcall-client PRIVATE app.rc)
 endif()

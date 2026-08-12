@@ -3,7 +3,7 @@
 
     X.state = {
         bridge: null,
-        iceTransportPolicy: 'relay',
+        iceTransportPolicy: 'all',
         iceServers: [],
         localStream: null,
         localAudioStream: null,
@@ -54,12 +54,6 @@
             pipMoved: false,
             pipX: null,
             pipY: null
-        },
-        screen: {
-            supported: false,
-            active: false,
-            stream: null,
-            track: null
         },
         recorder: {
             supported: false,

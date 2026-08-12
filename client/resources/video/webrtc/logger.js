@@ -17,7 +17,6 @@
         bridge: make('Bridge'),
         state: make('State'),
         ui: make('UI'),
-        screen: make('Screen'),
         recorder: make('Recorder'),
         warn: function (tag, message) {
             if (message === undefined) {

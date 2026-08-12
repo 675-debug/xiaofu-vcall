@@ -60,11 +60,11 @@ void LoginWidget::on_btnLogin_clicked() {
 
 void LoginWidget::onLoginResult(int code, const QString& message, const QString& username) {
     Q_UNUSED(message);
-    if (code == 0) {
+    if (code == Protocol::Ok) {
         loginAttempts = 0;
         qDebug() << "Login success for user" << username;
         emit loginSucceeded(username);
-    } else if (code == kAccountAlreadyLoggedInCode) {
+    } else if (code == Protocol::AccountAlreadyLoggedIn) {
         if (alreadyLoggedInDialogShown)
             return;
         alreadyLoggedInDialogShown = true;
@@ -72,7 +72,7 @@ void LoginWidget::onLoginResult(int code, const QString& message, const QString&
         ui->btnLogin->setEnabled(true);
         // 模态提示框只提供"确定"按钮；用户点击确定后才清空表单并回到账号框。
         // 保持登录页，不进入主界面，不创建会话，不自动重试，不退出程序。
-        QMessageBox::information(this, "提示", "该账户在异地登录。");
+        QMessageBox::information(this, "提示", "该账户已在别处登录。");
         resetLoginForm();
     } else {
         loginAttempts++;

@@ -27,7 +27,6 @@
         <file alias="webrtc/subtitle.js">resources/video/webrtc/subtitle.js</file>
         <file alias="webrtc/peer.js">resources/video/webrtc/peer.js</file>
         <file alias="webrtc/ui.js">resources/video/webrtc/ui.js</file>
-        <file alias="webrtc/screen.js">resources/video/webrtc/screen.js</file>
         <file alias="webrtc/recorder.js">resources/video/webrtc/recorder.js</file>
         <file alias="webrtc/signaling.js">resources/video/webrtc/signaling.js</file>
     </qresource>

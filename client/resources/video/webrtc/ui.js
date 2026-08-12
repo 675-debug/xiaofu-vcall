@@ -182,22 +182,17 @@
         return document.querySelector(selector);
     }
 
-    function setScreenShareState(state) {
-        X.state.screen.active = !!state;
-        var button = findButton('#share-button');
-        if (button) {
-            button.textContent = state ? '停止共享屏幕' : '共享屏幕';
-            button.setAttribute('data-active', state ? 'true' : 'false');
-        }
-        X.log.ui('SCREEN_SHARE_STATE active=' + !!state);
-    }
-
     function setRecordingState(state) {
         X.state.recorder.recording = !!state;
         var button = findButton('#record-button');
         if (button) {
-            button.textContent = state ? '停止录制通话' : '录制通话';
+            button.textContent = state ? '停止录屏' : '录屏';
             button.setAttribute('data-active', state ? 'true' : 'false');
+        }
+        if (state) {
+            startRecordTimer();
+        } else {
+            stopRecordTimer();
         }
         X.log.ui('RECORDING_STATE recording=' + !!state);
     }
@@ -279,6 +274,8 @@
         var moreButton = document.getElementById('more-button');
         if (!popover || !moreButton) return;
         if (popover.contains(event.target) || moreButton.contains(event.target)) return;
+        // 程序化下载（录屏 WebM 保存）触发的 click 不应被识别为“菜单外点击”。
+        if (event.target && event.target.tagName === 'A' && event.target.hasAttribute('download')) return;
         closeMoreMenu();
     }
 
@@ -374,22 +371,6 @@
             toastTimer = 0;
         }, 2000);
         X.log.ui('TOAST ' + message);
-    }
-
-    function setScreenShareUnsupported(flag) {
-        var button = findButton('#share-button');
-        if (button) {
-            if (flag) {
-                button.setAttribute('data-unsupported', 'true');
-                button.title = '当前版本暂不支持屏幕共享';
-                button.setAttribute('aria-label', '共享屏幕（当前版本暂不支持）');
-            } else {
-                button.removeAttribute('data-unsupported');
-                button.title = '共享屏幕';
-                button.setAttribute('aria-label', '共享屏幕');
-            }
-        }
-        X.log.ui('SCREEN_SHARE_UNSUPPORTED flag=' + !!flag);
     }
 
     function init() {
@@ -526,11 +507,60 @@
         }
         X.log.ui('CALL_TIMER_STOP');
     }
+    var recordTimerInterval = 0;
+
+    function formatRecordTime(totalSeconds) {
+        var h = Math.floor(totalSeconds / 3600);
+        var m = Math.floor((totalSeconds % 3600) / 60);
+        var s = totalSeconds % 60;
+        var mm = (m < 10 ? '0' + m : '' + m);
+        var ss = (s < 10 ? '0' + s : '' + s);
+        if (h > 0) {
+            var hh = (h < 10 ? '0' + h : '' + h);
+            return hh + ':' + mm + ':' + ss;
+        }
+        return mm + ':' + ss;
+    }
+
+    function updateRecordTimer() {
+        var startedAt = X.state.recorder ? X.state.recorder.startedAt : 0;
+        var indicator = document.getElementById('record-indicator');
+        var timeEl = document.getElementById('record-time');
+        if (indicator && indicator.style.display !== 'none' && !startedAt) {
+            stopRecordTimer();
+            return;
+        }
+        var totalSeconds = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
+        if (timeEl) timeEl.textContent = formatRecordTime(totalSeconds);
+    }
+
+    function startRecordTimer() {
+        if (recordTimerInterval) return;
+        var indicator = document.getElementById('record-indicator');
+        if (indicator) {
+            indicator.style.display = 'block';
+            updateRecordTimer();
+        }
+        recordTimerInterval = setInterval(updateRecordTimer, 1000);
+        X.log.ui('RECORD_TIMER_START');
+    }
+
+    function stopRecordTimer() {
+        if (recordTimerInterval) {
+            clearInterval(recordTimerInterval);
+            recordTimerInterval = 0;
+        }
+        var indicator = document.getElementById('record-indicator');
+        if (indicator) indicator.style.display = 'none';
+        var timeEl = document.getElementById('record-time');
+        if (timeEl) timeEl.textContent = '00:00';
+        X.log.ui('RECORD_TIMER_STOP');
+    }
+
     X.ui = {
         init: init,
         initLocalPipDrag: bindDrag,
         resetLocalPipPosition: resetLocalPipPosition,
-        setScreenShareState: setScreenShareState,
         setRecordingState: setRecordingState,
         closeMoreMenu: closeMoreMenu,
         reClamp: reClamp,
@@ -541,14 +571,13 @@
         setCameraProfilePending: setCameraProfilePending,
         setFullscreenState: setFullscreenState,
         showToast: showToast,
-        setScreenShareUnsupported: setScreenShareUnsupported,
         repositionMoreMenu: repositionMoreMenu,
         startCallTimer: startCallTimer,
         stopCallTimer: stopCallTimer,
+        startRecordTimer: startRecordTimer,
+        stopRecordTimer: stopRecordTimer,
         setSubtitleState: setSubtitleState
     };
 
     X.log.ui('loaded');
 }(window.Xiaofu = window.Xiaofu || {}));
-
-

@@ -35,9 +35,11 @@ HEADERS += \
     src/ForgotPasswordWidget.h \
     src/ChatWidget.h \
     src/CallWidget.h \
+    src/RecordingPaths.h \
     src/video/WebRtcBridge.h \
     src/video/VideoCallController.h \
     src/network/NetworkManager.h
+    src/network/ProtocolCodes.h
 
 FORMS += \
     ui/MainWindow.ui \
@@ -49,3 +51,12 @@ FORMS += \
     ui/CallWidget.ui
 
 RESOURCES += resources.qrc
+
+# WebEngine 网页资源（resources/video/** 的 JS）由 Chromium/V8 运行时解析，不是 QML JavaScript。
+# Qt 6.11 的 qtquickcompiler(qmlcachegen) 会把资源内所有 .js 当 QML JS 预编译，
+# 无法解析 async/await 等现代浏览器语法（误报 Expected token ','），且本项目没有 QML 文件，
+# 因此显式关闭该特性，让 HTML/CSS/JS 保持普通资源由 WebEngine 运行时加载。
+CONFIG -= qtquickcompiler
+
+# Windows exe 图标
+RC_ICONS += app.ico

@@ -1,6 +1,7 @@
 #include "MainWidget.h"
 #include "ui_MainWidget.h"
 #include "network/NetworkManager.h"
+#include "RecordingPaths.h"
 #include <QDebug>
 #include <QListWidgetItem>
 #include <QLabel>
@@ -18,8 +19,11 @@
 #include <QTime>
 #include <QJsonArray>
 #include <QInputDialog>
+#include <QLineEdit>
 #include <QDialog>
 #include <QPushButton>
+#include <QSettings>
+#include <QFileDialog>
 
 // 联系人姓名标签：超长文本自动省略号，避免被右边缘截断
 class ElidedLabel : public QLabel {
@@ -263,8 +267,28 @@ void MainWidget::on_btnSettings_clicked() {
     ui->settingsMask->setGeometry(rect());
     ui->settingsPanel->move((width() - ui->settingsPanel->width()) / 2,
                             (height() - ui->settingsPanel->height()) / 2);
+    ui->editRecordDir->setText(recordSaveDirectory());
     ui->settingsMask->raise();
     ui->settingsMask->setVisible(true);
+}
+
+void MainWidget::on_btnChooseRecordDir_clicked() {
+    const QString current = recordSaveDirectory();
+    const QString dir = QFileDialog::getExistingDirectory(
+        this, QStringLiteral("选择录屏保存目录"), current,
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if (dir.isEmpty()) {
+        return;  // 用户取消选择时不修改原路径
+    }
+    QSettings().setValue(QStringLiteral("recording/saveDirectory"), dir);
+    ui->editRecordDir->setText(dir);
+}
+
+QString MainWidget::recordSaveDirectory() const {
+    const QString dir = RecordingPaths::configuredOrDefault();
+    // 目录不存在时自动创建，不要求用户提前建目录。
+    RecordingPaths::ensureDirectory(dir);
+    return dir;
 }
 
 void MainWidget::on_btnAddContact_clicked() {
@@ -273,15 +297,77 @@ void MainWidget::on_btnAddContact_clicked() {
                              QStringLiteral("当前未连接到服务器，请重新登录后再试。"));
         return;
     }
-    bool accepted = false;
-    const QString username = QInputDialog::getText(this, QStringLiteral("添加联系人"),
-                                                   QStringLiteral("输入对方账号："),
-                                                   QLineEdit::Normal, QString(), &accepted).trimmed();
-    if (accepted && !username.isEmpty()) {
+    const QString username = showAddContactDialog();
+    if (!username.isEmpty()) {
         qDebug() << "[Main] friend request:" << username;
         networkManager->addContact(username);
     }
 }
+
+QString MainWidget::showAddContactDialog() {
+    QDialog dialog(this);
+    dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    dialog.setModal(true);
+    dialog.setFixedSize(420, 260);
+    dialog.setAttribute(Qt::WA_StyledBackground, true);
+    dialog.setStyleSheet(
+        "QDialog{background:#FFFFFF;border:1px solid #C7C7CC;border-radius:14px;}"
+        "QLabel{background:transparent;}"
+        "QLineEdit{min-height:40px;border:1.5px solid #E8E8ED;border-radius:10px;padding:0 12px;font-size:14px;background:#FAFAFA;color:#1A1A2E;}"
+        "QLineEdit:focus{border-color:#007AFF;background:#FFFFFF;}"
+        "QPushButton{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}"
+        "QPushButton#cancelButton{background:#F4F4F6;color:#5C5C66;border:1px solid #D9D9DE;}"
+        "QPushButton#cancelButton:hover{background:#E9E9ED;}"
+        "QPushButton#addButton{background:#007AFF;color:#FFFFFF;border:none;}"
+        "QPushButton#addButton:hover{background:#006CE6;}"
+        "QPushButton#addButton:disabled{background:#A8CFFF;color:#F7FAFF;}");
+
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(28, 24, 28, 24);
+    layout->setSpacing(14);
+
+    auto* title = new QLabel(QStringLiteral("添加联系人"), &dialog);
+    title->setStyleSheet("font-size:17px;font-weight:700;color:#1A1A2E;");
+    layout->addWidget(title);
+
+    auto* tip = new QLabel(QStringLiteral("输入对方账号，发送好友申请"), &dialog);
+    tip->setStyleSheet("font-size:13px;color:#5C5C66;");
+    layout->addWidget(tip);
+
+    auto* edit = new QLineEdit(&dialog);
+    edit->setPlaceholderText(QStringLiteral("请输入对方账号"));
+    edit->setClearButtonEnabled(true);
+    layout->addWidget(edit);
+    layout->addStretch();
+
+    auto* buttonRow = new QHBoxLayout;
+    buttonRow->setSpacing(10);
+    auto* cancelButton = new QPushButton(QStringLiteral("取消"), &dialog);
+    cancelButton->setObjectName("cancelButton");
+    auto* addButton = new QPushButton(QStringLiteral("添加"), &dialog);
+    addButton->setObjectName("addButton");
+    addButton->setEnabled(false);
+    buttonRow->addStretch();
+    buttonRow->addWidget(cancelButton);
+    buttonRow->addWidget(addButton);
+    layout->addLayout(buttonRow);
+
+    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(addButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(edit, &QLineEdit::textChanged, &dialog, [addButton](const QString& text) {
+        addButton->setEnabled(!text.trimmed().isEmpty());
+    });
+    connect(edit, &QLineEdit::returnPressed, addButton, &QPushButton::click);
+
+    QString username;
+    connect(addButton, &QPushButton::clicked, &dialog, [&username, edit]() {
+        username = edit->text().trimmed();
+    });
+
+    dialog.exec();
+    return username;
+}
+
 
 void MainWidget::on_btnLogout_clicked() {
     // TODO: 通知服务器下线并回到登录页

@@ -33,6 +33,7 @@ private slots:
     void on_btnClose_clicked();
     void on_btnAvatar_clicked();
     void on_btnSettings_clicked();
+    void on_btnChooseRecordDir_clicked();
     void on_btnAddContact_clicked();
     void on_btnLogout_clicked();
     void on_btnCloseModal_clicked();
@@ -69,6 +70,8 @@ private:
     QString avatarColor(int avatarSeed) const;
     void updateChatAvatar(const QString& nickname, int avatarSeed, bool online);
     void showFriendRequestDialog(const QString& sender, const QString& nickname, int avatarSeed);
+    QString showAddContactDialog();
+    QString recordSaveDirectory() const;
 
     Ui::MainWidget* ui;
     NetworkManager* networkManager = nullptr;

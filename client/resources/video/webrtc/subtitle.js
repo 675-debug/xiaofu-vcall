@@ -3,9 +3,9 @@
 
     /* 实时字幕：AudioWorklet 采集远端音频 → 16kHz PCM → WebSocket → FunASR → 黑底白字字幕 */
 
-    // 服务地址：默认本机 FunASR 服务（ws://127.0.0.1:10095），仅占位默认值，不绑定任何云厂商。
-    // 页面加载完成后 C++ 桥会通过 X.subtitle.setUrl() 注入覆盖（可用 XIAOFU_ASR_URL 环境变量修改）。
-    var ASR_URL = 'ws://127.0.0.1:10095';
+    // 服务地址：由 C++ 桥通过 X.subtitle.setUrl() 注入（来源：asr.url 运行配置 / XIAOFU_ASR_URL 环境变量 / 编译默认）。
+    // 这里不维护任何生产或本机兜底地址；未注入时不会发起 WebSocket 连接。
+    var ASR_URL = '';
 
     // AudioWorklet 处理器源码（内嵌字符串，用 Blob URL 加载，避免 qrc:// 的 fetch 限制）。
     // 采用方案 A：AudioContext 以 16000 创建，引擎自动重采样，这里只做 16bit 转换 + 攒 60ms 块。
@@ -85,17 +85,17 @@
             state.currentText = text;
             var bar = subtitleBar();
             bar.textContent = text;
+            log('SUBTITLE_RENDER len=' + text.length);
             showBar();
             if (state.hideTimer) clearTimeout(state.hideTimer);
             state.hideTimer = setTimeout(hideBar, 4000);
         }
     }
 
-    // C++ 桥在页面加载后调用，覆盖字幕服务地址（默认已指向云服务器）。
+    // C++ 桥在页面加载后调用，覆盖字幕服务地址；未注入时保持为空，连接阶段会提示失败。
     function setUrl(url) {
-        if (!url) return;
-        ASR_URL = url;
-        log('URL_SET ' + url);
+        ASR_URL = url || '';
+        log('URL_SET ' + (ASR_URL || '(none)'));
     }
 
     function sendHandshake() {
@@ -114,6 +114,13 @@
 
     function connectWs() {
         return new Promise(function (resolve, reject) {
+            if (!ASR_URL) {
+                updateText('字幕服务未配置');
+                warn('NO_ASR_URL url not injected');
+                reject(new Error('subtitle url not configured'));
+                return;
+            }
+            log('WS_CONNECT_BEGIN url=' + ASR_URL);
             var ws;
             try {
                 ws = new WebSocket(ASR_URL);
@@ -125,12 +132,16 @@
             ws.binaryType = 'arraybuffer';
             ws.onopen = function () {
                 state.wsReady = true;
-                sendHandshake();
                 log('WS_OPEN');
+                sendHandshake();
                 resolve();
             };
             ws.onmessage = function (event) {
-                if (typeof event.data !== 'string') return;
+                if (typeof event.data !== 'string') {
+                    log('WS_MESSAGE textLength=-1');
+                    return;
+                }
+                log('WS_MESSAGE textLength=' + event.data.length);
                 var msg;
                 try {
                     msg = JSON.parse(event.data);
@@ -138,15 +149,22 @@
                     return;
                 }
                 if (msg && msg.text) {
+                    if (msg.is_final === true || msg.is_final === 1) {
+                        log('ASR_FINAL text=' + msg.text);
+                    } else {
+                        log('ASR_PARTIAL text=' + msg.text);
+                    }
                     updateText(msg.text);
                 }
             };
             ws.onerror = function () {
-                warn('WS_ERROR');
+                log('WS_ERROR');
             };
-            ws.onclose = function () {
+            ws.onclose = function (event) {
                 state.wsReady = false;
-                log('WS_CLOSE');
+                var code = (event && event.code !== undefined) ? event.code : '';
+                var reason = (event && event.reason) ? event.reason : '';
+                log('WS_CLOSE code=' + code + ' reason=' + reason);
             };
         });
     }
@@ -196,6 +214,7 @@
             state.node.port.onmessage = function (event) {
                 if (state.ws && state.wsReady && state.ws.readyState === WebSocket.OPEN) {
                     state.ws.send(event.data);
+                    log('PCM_SEND bytes=' + event.data.byteLength);
                 }
             };
             attachSource(track);
@@ -215,7 +234,7 @@
         updateText('实时字幕已开启…');
         connectWs().catch(function (error) {
             warn('WS_CONNECT_FAIL ' + error);
-            updateText('字幕服务连接失败，请检查网络');
+            updateText(ASR_URL ? '字幕服务连接失败' : '字幕服务未配置');
         });
         if (state.pendingTrack) {
             setupAudio(state.pendingTrack).catch(function (error) {
@@ -263,6 +282,7 @@
     // 由 peer.js ontrack 调用：接入远端音频 track
     function attachRemoteTrack(track) {
         if (!track || track.kind !== 'audio') return;
+        log('REMOTE_AUDIO_TRACK kind=' + track.kind);
         state.pendingTrack = track;
         if (state.enabled) {
             setupAudio(track).catch(function (error) {

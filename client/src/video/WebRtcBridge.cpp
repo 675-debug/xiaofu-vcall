@@ -134,12 +134,13 @@ void WebRtcBridge::applySubtitleUrl() {
         return;
     setSubtitleUrl(pendingSubtitleUrl);
 }
-void WebRtcBridge::toggleScreenShare() {
-    runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.screenToggle();"));
-}
-
 void WebRtcBridge::toggleRecording() {
     runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.recorderToggle();"));
+}
+void WebRtcBridge::showToast(const QString& message) {
+    const QByteArray escaped = QJsonDocument::fromVariant(message).toJson(QJsonDocument::Compact);
+    runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.showToast(%1);")
+                      .arg(QString::fromUtf8(escaped)));
 }
 
 void WebRtcBridge::reportPreviewReady(const QVariantMap& settings) {

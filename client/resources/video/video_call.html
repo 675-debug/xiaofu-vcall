@@ -22,6 +22,11 @@
         #call-timer { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 1800;
             background: rgba(0,0,0,.55); color: #FFFFFF; font: 13px "Microsoft YaHei UI", sans-serif;
             padding: 4px 12px; border-radius: 12px; letter-spacing: .5px; display: none; }
+        #record-indicator { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 1800;
+            background: rgba(0,0,0,.55); color: #FFFFFF; font: 13px "Microsoft YaHei UI", sans-serif;
+            padding: 4px 12px; border-radius: 12px; letter-spacing: .5px; display: none; white-space: nowrap; }
+        #record-indicator .rec-dot { color: #FF3B30; animation: rec-blink 1s linear infinite; }
+        @keyframes rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: .15; } }
         #empty-state { position: absolute; inset: 0; display: flex; align-items: center;
             justify-content: center; color: rgba(255,255,255,.62); font: 14px "Microsoft YaHei UI", sans-serif; }
         #call-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
@@ -41,8 +46,6 @@
         #more-popover button:focus-visible { outline: none; background: rgba(0,0,0,.08); }
         #more-popover button:disabled { opacity: .5; cursor: default; }
         #more-popover button:disabled:hover { background: transparent; }
-        #more-popover button[data-unsupported="true"] { opacity: .5; }
-        #more-popover button[data-unsupported="true"]:hover { background: transparent; }
         #call-controls button img { width: 24px; height: 24px; pointer-events: none; }
         #hangup-button { background: #FF3B30; color: #FFFFFF; }
         #hangup-button:hover { background: #E0352B; }
@@ -64,7 +67,7 @@
         #camera-profile-bar button:hover { background: rgba(255,255,255,.3); }
         #camera-profile-bar button[data-active="true"] { background: #007AFF; color: #FFFFFF; font-weight: 600; }
         #camera-profile-bar button:disabled { opacity: .5; cursor: default; }
-        #subtitle-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 84px;
+        #subtitle-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 119px;
             max-width: 82%; z-index: 2200; background: rgba(0,0,0,.75); color: #FFFFFF;
             font: 15px/1.5 "Microsoft YaHei UI", sans-serif; padding: 6px 14px; border-radius: 8px;
             text-align: center; display: none; pointer-events: none; white-space: pre-wrap; word-break: break-all; }
@@ -74,6 +77,7 @@
     <main id="call-stage">
         <video id="remote-video" autoplay playsinline></video>
         <div id="call-timer">00:00</div>
+        <div id="record-indicator"><span class="rec-dot">●</span> 录屏中：<span id="record-time">00:00</span></div>
         <audio id="remote-audio" autoplay></audio>
         <div id="local-pip">
             <video id="local-video" autoplay muted playsinline></video>
@@ -88,8 +92,7 @@
             <span id="more-wrapper" style="position:relative">
             <button id="more-button" type="button" title="更多" aria-label="更多"><img src="qrc:///icons/icon-more.png" alt="更多"></button>
             <div id="more-popover" class="hidden">
-                <button id="share-button" type="button">共享屏幕</button>
-                <button id="record-button" type="button">录制通话</button>
+                <button id="record-button" type="button">录屏</button>
                 <button id="fullscreen-button" type="button">全屏</button>
                 <button id="subtitle-button" type="button">实时字幕</button>
             </div>
@@ -108,7 +111,6 @@
     <script src="qrc:///video/webrtc/peer.js"></script>
     <script src="qrc:///video/webrtc/signaling.js"></script>
     <script src="qrc:///video/webrtc/ui.js"></script>
-    <script src="qrc:///video/webrtc/screen.js"></script>
     <script src="qrc:///video/webrtc/recorder.js"></script>
     <script src="qrc:///video/video_call.js"></script>
 </body>

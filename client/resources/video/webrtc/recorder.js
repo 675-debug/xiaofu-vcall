@@ -121,6 +121,11 @@
             saveCounter++;
             a.href = url;
             a.download = 'vcall-' + stamp + '-' + saveCounter + '.webm';
+            a.style.display = 'none';
+            // 程序化下载 click 不应冒泡成“页面点击”，避免误关更多菜单。
+            a.addEventListener('click', function (event) {
+                if (event && event.stopPropagation) event.stopPropagation();
+            });
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -190,6 +195,11 @@
         };
         recorder.onerror = function (event) {
             X.log.warn('Recorder', 'ERROR ' + (event && event.error ? event.error : 'unknown'));
+            if (X.state.recorder.recording) {
+                X.state.recorder.recording = false;
+                X.state.recorder.startedAt = 0;
+                if (X.ui.setRecordingState) X.ui.setRecordingState(false);
+            }
         };
         recorder.onstop = function () {
             stopDraw();

@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QFont>
 #include <QStringList>
@@ -29,6 +30,9 @@ int main(int argc, char* argv[]) {
     }
 
     QApplication app(argc, argv);
+    // ????????????? QSettings ?????????/??????????
+    QCoreApplication::setOrganizationName(QStringLiteral("xiaofu-vcall"));
+    QCoreApplication::setApplicationName(QStringLiteral("xiaofu-vcall-client"));
     qInfo().noquote() << "[WebEnv] Qt version=" << qVersion();
     qInfo().noquote() << "[WebEnv] OS=" << QSysInfo::prettyProductName()
                       << "kernel=" << QSysInfo::kernelType() << QSysInfo::kernelVersion();
