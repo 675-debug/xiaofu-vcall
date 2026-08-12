@@ -75,8 +75,14 @@
                 if (report.type === 'outbound-rtp' && (report.kind === 'video' || report.mediaType === 'video')) {
                     X.log.stats('VIDEO_OUT reason=' + reason + ' codec=' + codecName(codecs, report.codecId) + ' packets=' + (report.packetsSent || 0) + ' bytes=' + (report.bytesSent || 0) + ' framesEncoded=' + (report.framesEncoded || report.framesSent || 0) + ' width=' + (report.frameWidth || '?') + ' height=' + (report.frameHeight || '?') + ' fps=' + (report.framesPerSecond || '?'));
                 }
+                if (report.type === 'outbound-rtp' && (report.kind === 'audio' || report.mediaType === 'audio')) {
+                    X.log.stats('AUDIO_OUT reason=' + reason + ' codec=' + codecName(codecs, report.codecId) + ' packets=' + (report.packetsSent || 0) + ' bytes=' + (report.bytesSent || 0));
+                }
                 if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video')) {
                     X.log.stats('VIDEO_IN reason=' + reason + ' codec=' + codecName(codecs, report.codecId) + ' packets=' + (report.packetsReceived || 0) + ' lost=' + (report.packetsLost || 0) + ' bytes=' + (report.bytesReceived || 0) + ' framesDecoded=' + (report.framesDecoded || report.framesReceived || 0) + ' framesDropped=' + (report.framesDropped || 0) + ' width=' + (report.frameWidth || '?') + ' height=' + (report.frameHeight || '?') + ' fps=' + (report.framesPerSecond || '?'));
+                }
+                if (report.type === 'inbound-rtp' && (report.kind === 'audio' || report.mediaType === 'audio')) {
+                    X.log.stats('AUDIO_IN reason=' + reason + ' codec=' + codecName(codecs, report.codecId) + ' packets=' + (report.packetsReceived || 0) + ' lost=' + (report.packetsLost || 0) + ' bytes=' + (report.bytesReceived || 0));
                 }
             });
             if (selectedPairId && pairs[selectedPairId]) {

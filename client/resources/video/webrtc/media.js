@@ -38,6 +38,14 @@
         }
         return {};
     }
+    function audioSettingsText(track) {
+        var s = videoTrackSettings(track);
+        return 'echoCancellation=' + (s.echoCancellation === undefined ? '?' : s.echoCancellation) + ' noiseSuppression=' + (s.noiseSuppression === undefined ? '?' : s.noiseSuppression) + ' autoGainControl=' + (s.autoGainControl === undefined ? '?' : s.autoGainControl) + ' channelCount=' + (s.channelCount === undefined ? '?' : s.channelCount);
+    }
+    function logLocalAudioTrack(track) {
+        X.log.media('LOCAL_AUDIO_TRACK id=' + (track.id || '?') + ' kind=' + track.kind + ' readyState=' + track.readyState + ' enabled=' + track.enabled + ' muted=' + track.muted);
+        X.log.media('AUDIO_SETTINGS ' + audioSettingsText(track));
+    }
 
     function isCurrentTrack(track) {
         return !!(track && X.state.localStream && getVideoTrack(X.state.localStream) === track);
@@ -781,7 +789,13 @@
             return Promise.resolve(null);
         }
         X.log.media('AUDIO_REQUEST');
-        return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        var audioConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1
+        };
+        return navigator.mediaDevices.getUserMedia({ audio: audioConstraints }).then(function (stream) {
             var track = getAudioTrack(stream);
             if (!track) {
                 stopTracks(stream);
@@ -791,6 +805,7 @@
             X.state.localAudioStream = stream;
             X.state.micEnabled = track.enabled !== false;
             X.log.media('AUDIO_GRANTED enabled=' + X.state.micEnabled);
+            logLocalAudioTrack(track);
             refreshAudioDeviceList();
             var audioSender = X.peer.getAudioSender ? X.peer.getAudioSender() : null;
             if (audioSender && X.peer.replaceAudioTrack) {
@@ -823,7 +838,7 @@
         }
         X.log.media('MIC_SWITCH_BEGIN deviceId=<set>');
         var oldStream = X.state.localAudioStream;
-        return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } }).then(function (stream) {
+        return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }).then(function (stream) {
             var track = getAudioTrack(stream);
             if (!track) {
                 stopTracks(stream);
@@ -840,6 +855,7 @@
                 X.state.micEnabled = track.enabled !== false;
                 refreshAudioDeviceList();
                 X.log.media('MIC_SWITCH_OK enabled=' + X.state.micEnabled);
+                logLocalAudioTrack(track);
                 return stream;
             }).catch(function (error) {
                 stopTracks(stream);

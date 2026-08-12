@@ -34,6 +34,8 @@
         'registerProcessor("subtitle-resampler", SubtitleResampler);'
     ].join('\n');
 
+    var MAX_SUBTITLE_CHARS = 50;
+
     var state = {
         enabled: false,
         ready: false,
@@ -46,7 +48,9 @@
         pendingTrack: null,
         bar: null,
         currentText: '',
-        hideTimer: 0
+        hideTimer: 0,
+        pcmTotalBytes: 0,
+        pcmLastLog: 0
     };
 
     function log(message) {
@@ -63,6 +67,10 @@
             if (!state.bar) {
                 state.bar = document.createElement('div');
                 state.bar.id = 'subtitle-bar';
+                state.bar.style.whiteSpace = 'nowrap';
+                state.bar.style.overflow = 'hidden';
+                state.bar.style.textOverflow = 'ellipsis';
+                state.bar.style.maxWidth = '82%';
                 var stage = document.getElementById('call-stage') || document.body;
                 stage.appendChild(state.bar);
             }
@@ -81,15 +89,16 @@
 
     function updateText(text) {
         if (!state.enabled) return;
-        if (text) {
-            state.currentText = text;
-            var bar = subtitleBar();
-            bar.textContent = text;
-            log('SUBTITLE_RENDER len=' + text.length);
-            showBar();
-            if (state.hideTimer) clearTimeout(state.hideTimer);
-            state.hideTimer = setTimeout(hideBar, 4000);
-        }
+        if (!text) return;
+        var rawLen = text.length;
+        var displayText = rawLen > MAX_SUBTITLE_CHARS ? text.slice(rawLen - MAX_SUBTITLE_CHARS) : text;
+        state.currentText = displayText;
+        var bar = subtitleBar();
+        bar.textContent = displayText;
+        log('SUBTITLE_RENDER ASR_RAW_LENGTH=' + rawLen + ' SUBTITLE_DISPLAY_LENGTH=' + displayText.length);
+        showBar();
+        if (state.hideTimer) clearTimeout(state.hideTimer);
+        state.hideTimer = setTimeout(hideBar, 4000);
     }
 
     // C++ 桥在页面加载后调用，覆盖字幕服务地址；未注入时保持为空，连接阶段会提示失败。
@@ -150,9 +159,9 @@
                 }
                 if (msg && msg.text) {
                     if (msg.is_final === true || msg.is_final === 1) {
-                        log('ASR_FINAL text=' + msg.text);
+                        log('ASR_FINAL ASR_RAW_LENGTH=' + msg.text.length);
                     } else {
-                        log('ASR_PARTIAL text=' + msg.text);
+                        log('ASR_PARTIAL ASR_RAW_LENGTH=' + msg.text.length);
                     }
                     updateText(msg.text);
                 }
@@ -214,7 +223,12 @@
             state.node.port.onmessage = function (event) {
                 if (state.ws && state.wsReady && state.ws.readyState === WebSocket.OPEN) {
                     state.ws.send(event.data);
-                    log('PCM_SEND bytes=' + event.data.byteLength);
+                    state.pcmTotalBytes += event.data.byteLength;
+                    var now = Date.now();
+                    if (now - state.pcmLastLog >= 2000) {
+                        log('PCM_SEND totalBytes=' + state.pcmTotalBytes);
+                        state.pcmLastLog = now;
+                    }
                 }
             };
             attachSource(track);
@@ -230,6 +244,8 @@
     function start() {
         if (state.enabled) return;
         state.enabled = true;
+        state.pcmTotalBytes = 0;
+        state.pcmLastLog = 0;
         showBar();
         updateText('实时字幕已开启…');
         connectWs().catch(function (error) {
@@ -282,7 +298,7 @@
     // 由 peer.js ontrack 调用：接入远端音频 track
     function attachRemoteTrack(track) {
         if (!track || track.kind !== 'audio') return;
-        log('REMOTE_AUDIO_TRACK kind=' + track.kind);
+        log('REMOTE_AUDIO_TRACK id=' + (track.id || '?') + ' kind=' + track.kind + ' readyState=' + track.readyState + ' enabled=' + track.enabled + ' muted=' + track.muted);
         state.pendingTrack = track;
         if (state.enabled) {
             setupAudio(track).catch(function (error) {

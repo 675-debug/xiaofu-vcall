@@ -270,7 +270,7 @@
         pc.ontrack = function (event) {
             if (!isCurrentPc(pc, pcId)) return;
             if (!event.track) return;
-            X.log.peer('REMOTE_TRACK kind=' + event.track.kind + ' id=' + (event.track.id || '?') + ' readyState=' + event.track.readyState);
+            X.log.peer('REMOTE_TRACK kind=' + event.track.kind + ' id=' + (event.track.id || '?') + ' readyState=' + event.track.readyState + ' enabled=' + event.track.enabled + ' muted=' + event.track.muted);
             if (event.track.kind === 'audio') {
                 attachRemoteAudioTrack(event.track);
                 if (X.subtitle && X.subtitle.attachRemoteTrack) {
@@ -421,7 +421,7 @@
                 var localTrack = X.media.getAudioTrack ? X.media.getAudioTrack(localStream) : null;
                 if (localTrack && localTrack.readyState === 'live' && transceiver.sender && typeof transceiver.sender.replaceTrack === 'function') {
                     transceiver.sender.replaceTrack(localTrack);
-                    X.log.peer('AUDIO_TRACK_ATTACHED');
+                    X.log.peer('AUDIO_TRACK_ATTACHED AUDIO_SENDER_TRACK_BOUND=' + (transceiver.sender.track === localTrack ? 'yes' : 'no'));
                 }
                 return;
             } catch (error) {
@@ -492,7 +492,7 @@
             return Promise.resolve(true);
         }
         return sender.replaceTrack(track).then(function () {
-            X.log.peer('AUDIO_SENDER_REPLACE_OK readyState=' + track.readyState);
+            X.log.peer('AUDIO_SENDER_REPLACE_OK readyState=' + track.readyState + ' AUDIO_SENDER_TRACK_BOUND=' + (sender.track === track ? 'yes' : 'no'));
             return true;
         }).catch(function (error) {
             X.log.warn('Peer', 'AUDIO_SENDER_REPLACE_FAIL ' + error);
