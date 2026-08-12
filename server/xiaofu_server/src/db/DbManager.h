@@ -74,8 +74,12 @@ public:
     bool setOffline(const std::string& username);
     bool initLoginlogForUser(const std::string& username);
 
+    // Check the MySQL connection and reconnect if it was lost.
+    bool ping();
+
     void close();
 
 private:
     MYSQL* mysql;
+    std::string databasePath;
 };

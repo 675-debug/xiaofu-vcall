@@ -85,6 +85,7 @@ DbManager::~DbManager() { close(); }
 bool DbManager::open(const std::string& dbPath) {
     if (mysql)
         return true;
+    databasePath = dbPath;
 
     const std::string host = envValue("XIAOFU_MYSQL_HOST", "127.0.0.1");
     const unsigned int port = static_cast<unsigned int>(
@@ -117,6 +118,17 @@ bool DbManager::open(const std::string& dbPath) {
 
     Log::info("mysql connected, database=" + database + " (path hint: " + dbPath + ")");
     return true;
+}
+
+bool DbManager::ping() {
+    if (mysql && mysql_ping(mysql) == 0)
+        return true;
+
+    if (mysql) {
+        Log::error(std::string("mysql connection lost, reconnecting: ") + mysql_error(mysql));
+        close();
+    }
+    return open(databasePath);
 }
 
 bool DbManager::createTables() {

@@ -2,8 +2,10 @@
 
 #include "../db/DbManager.h"
 #include "../util/Log.h"
+#include <chrono>
 #include <condition_variable>
 #include <exception>
+#include <thread>
 
 ThreadPool::ThreadPool(std::size_t workerCount, std::string databasePath)
     : databasePath(std::move(databasePath)) {
@@ -42,24 +44,47 @@ std::size_t ThreadPool::workerCount() const {
 
 void ThreadPool::workerLoop(std::size_t workerIndex) {
     DbManager database;
-    if (!database.open(databasePath) || !database.createTables()) {
-        Log::error("worker database initialization failed, index="
+
+    // 初始连接失败时持续重试，直到 MySQL 可用或服务停止。
+    while (!stopping.load()) {
+        if (database.open(databasePath) && database.createTables())
+            break;
+        Log::error("worker database connection failed, retrying in 3s, index="
                    + std::to_string(workerIndex));
-        return;
+        std::this_thread::sleep_for(std::chrono::seconds(3));
     }
+    if (stopping.load())
+        return;
     Log::info("database worker ready, index=" + std::to_string(workerIndex));
 
     while (true) {
         Task task;
+        bool hasTask = false;
         {
             std::unique_lock<std::mutex> lock(queueMutex);
-            queueCondition.wait(lock, [this]() {
+            queueCondition.wait_for(lock, std::chrono::seconds(30), [this]() {
                 return stopping.load() || !tasks.empty();
             });
             if (stopping.load() && tasks.empty())
                 return;
-            task = std::move(tasks.front());
-            tasks.pop();
+            if (!tasks.empty()) {
+                task = std::move(tasks.front());
+                tasks.pop();
+                hasTask = true;
+            }
+        }
+
+        if (!hasTask) {
+            // 空闲时周期性检查 MySQL 连接，断线则自动重连。
+            if (!database.ping())
+                Log::warn("mysql health check failed, will retry on next check");
+            continue;
+        }
+
+        // 执行任务前确保连接可用，断线会自动重连。
+        if (!database.ping()) {
+            Log::error("mysql unavailable, DB task skipped");
+            continue;
         }
 
         try {
