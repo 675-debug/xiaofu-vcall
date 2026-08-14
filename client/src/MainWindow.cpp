@@ -13,16 +13,22 @@
 #include <QMessageBox>
 #include <QtGlobal>
 #include <QCursor>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QWindow>
 
-const QSize MainWindow::kAuthWindowSizePhysical = QSize(800, 880);
-const QSize MainWindow::kWorkspaceWindowSizePhysical = QSize(1861, 1065);
-const QSize MainWindow::kMinWorkspaceWindowSizePhysical = QSize(186, 106);
+const QSize MainWindow::kAuthWindowSize = QSize(800, 880);
+const QSize MainWindow::kWorkspaceWindowSize = QSize(1240, 760);
+const QSize MainWindow::kMinWorkspaceWindowSize = QSize(620, 420);
 
-QSize MainWindow::logicalSizeFor(const QSize& physical) const {
-    const qreal dpr = devicePixelRatioF();
-    return QSize(qMax(1, qRound(physical.width() / dpr)),
-                 qMax(1, qRound(physical.height() / dpr)));
+QSize MainWindow::boundedWindowSize(const QSize& preferred) const {
+    QScreen* screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
+    if (!screen)
+        return preferred;
+    const QSize available = screen->availableGeometry().size() - QSize(32, 32);
+    if (preferred.width() <= available.width() && preferred.height() <= available.height())
+        return preferred;
+    return preferred.scaled(available, Qt::KeepAspectRatio);
 }
 
 MainWindow::MainWindow(QWidget* parent)
@@ -66,17 +72,18 @@ void MainWindow::initNetwork() {
 
 void MainWindow::showAuthPage(int index) {
     ui->stackMain->setCurrentIndex(index);
-    resize(logicalSizeFor(kAuthWindowSizePhysical));
+    resize(boundedWindowSize(kAuthWindowSize));
     applyPageMinimumSize();
 }
 
 void MainWindow::showWorkspacePage(int index) {
     ui->stackMain->setCurrentIndex(index);
-    resize(logicalSizeFor(kWorkspaceWindowSizePhysical));
+    resize(boundedWindowSize(kWorkspaceWindowSize));
     applyPageMinimumSize();
     // 打印逻辑尺寸与 DPR，避免高分屏缩放导致窗口尺寸误判。
-    qDebug().noquote() << "[MainWindow] WORKSPACE_SIZE targetPhysical=" << kWorkspaceWindowSizePhysical
-                       << "logical=" << size() << "dpr=" << devicePixelRatio();
+    qDebug().noquote() << "[MainWindow] WORKSPACE_SIZE preferredLogical="
+                       << kWorkspaceWindowSize << "actualLogical=" << size()
+                       << "dpr=" << devicePixelRatioF();
 }
 
 void MainWindow::showEvent(QShowEvent* event) {
@@ -225,7 +232,7 @@ void MainWindow::applyPageMinimumSize() {
     const int idx = ui->stackMain->currentIndex();
     if (idx == 1 || idx == 2 || idx == 3) {
         // 认证页：保持登录/注册/忘记密码页面原有最小尺寸，本轮不为 resize 大改。
-        const QSize authMin = logicalSizeFor(QSize(400, 510));
+        const QSize authMin(400, 510);
         setMinimumSize(authMin);
         if (QWidget* page = ui->stackMain->currentWidget())
             page->setMinimumSize(authMin);
@@ -235,7 +242,7 @@ void MainWindow::applyPageMinimumSize() {
         ui->callPage->setMinimumSize(0, 0);
     } else {
         // 主面板/通话页：允许缩到默认尺寸的约 10%（186x106 物理像素）。
-        setMinimumSize(logicalSizeFor(kMinWorkspaceWindowSizePhysical));
+        setMinimumSize(kMinWorkspaceWindowSize);
         // QStackedWidget 的最小尺寸是所有子页面的最大值，只有把全部页面
         // 的最小尺寸约束解除，顶层窗口才能真正缩到 186x106。
         ui->mainPage->setMinimumSize(0, 0);

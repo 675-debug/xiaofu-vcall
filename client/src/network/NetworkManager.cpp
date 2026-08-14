@@ -37,6 +37,10 @@ void NetworkManager::sendFrame(const QByteArray& payload) {
     tcpSocket->write(frame);
 }
 
+void NetworkManager::sendJson(const QJsonObject& request) {
+    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+}
+
 void NetworkManager::sendRegister(const QString& username, const QString& email, const QString& password,
                                   const QString& nickname, int avatarSeed) {
     QJsonObject request;
@@ -46,7 +50,7 @@ void NetworkManager::sendRegister(const QString& username, const QString& email,
     request["password"] = password;
     request["nickname"] = nickname;
     request["avatarSeed"] = avatarSeed;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::sendLogin(const QString& username, const QString& password) {
@@ -54,7 +58,7 @@ void NetworkManager::sendLogin(const QString& username, const QString& password)
     request["type"] = "login";
     request["username"] = username;
     request["password"] = password;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::sendForgot(const QString& username, const QString& newPassword) {
@@ -62,7 +66,7 @@ void NetworkManager::sendForgot(const QString& username, const QString& newPassw
     request["type"] = "forgot";
     request["username"] = username;
     request["newPassword"] = newPassword;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::sendJoin(const QString& username) {
@@ -70,7 +74,7 @@ void NetworkManager::sendJoin(const QString& username) {
     QJsonObject request;
     request["type"] = "join";
     request["username"] = username;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::sendHeartbeat() {
@@ -78,8 +82,7 @@ void NetworkManager::sendHeartbeat() {
         return;
     QJsonObject request;
     request["type"] = "heartbeat";
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
-    qDebug() << "[Network] heartbeat sent:" << loggedInUsername;
+    sendJson(request);
 }
 
 void NetworkManager::logout() {
@@ -91,47 +94,43 @@ void NetworkManager::logout() {
     if (tcpSocket->state() == QAbstractSocket::ConnectedState) {
         QJsonObject request;
         request["type"] = "leave";
-        sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
-        qDebug() << "[Network] leave request:" << loggedInUsername;
+        sendJson(request);
     }
     loggedInUsername.clear();
 }
 
 void NetworkManager::sendChat(const QString& receiver, const QString& content) {
-    qDebug() << "[Network] chat request: receiver=" << receiver << "characters=" << content.size();
     QJsonObject request;
     request["type"] = "chat";
     request["to"] = receiver;
     request["content"] = content;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::requestHistory(const QString& peer) {
-    qDebug() << "[Network] history request:" << peer;
     QJsonObject request;
     request["type"] = "history";
     request["peer"] = peer;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::deleteConversation(const QString& peer) {
     QJsonObject request;
     request["type"] = "delete_chat";
     request["peer"] = peer;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::clearAllChats() {
     QJsonObject request;
     request["type"] = "clear_chats";
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::requestContacts() {
-    qDebug() << "[Network] contacts request";
     QJsonObject request;
     request["type"] = "contacts";
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::addContact(const QString& username) {
@@ -139,18 +138,16 @@ void NetworkManager::addContact(const QString& username) {
         qDebug() << "[Network] add contact ignored: not connected or not logged in";
         return;
     }
-    qDebug() << "[Network] friend request:" << username;
     QJsonObject request;
     request["type"] = "friend_request";
     request["username"] = username;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::requestFriendRequests() {
-    qDebug() << "[Network] pending friend requests";
     QJsonObject request;
     request["type"] = "friend_requests";
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 void NetworkManager::respondToFriendRequest(const QString& sender, bool accepted) {
@@ -158,8 +155,7 @@ void NetworkManager::respondToFriendRequest(const QString& sender, bool accepted
     request["type"] = "friend_request_response";
     request["sender"] = sender;
     request["accepted"] = accepted;
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
-    qDebug() << "[Network] friend request response:" << sender << accepted;
+    sendJson(request);
 }
 
 void NetworkManager::sendCallSignal(const QVariantMap& signal) {
@@ -169,9 +165,7 @@ void NetworkManager::sendCallSignal(const QVariantMap& signal) {
     }
 
     const QJsonObject request = QJsonObject::fromVariantMap(signal);
-    qDebug() << "[Network] call signal:" << request.value("type").toString()
-             << "to=" << request.value("to").toString();
-    sendFrame(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    sendJson(request);
 }
 
 QString NetworkManager::currentUsername() const {
@@ -216,7 +210,6 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
     const QString type = response.value("type").toString();
     const int code = response.value("code").toInt(-1);
     const QString message = response.value("msg").toString();
-    qDebug() << "[Network] response:" << type << "code=" << code;
 
     if (type == "register_resp") {
         emit registerResult(code, message);
@@ -239,14 +232,11 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
         }
         emit joinResult(code, message);
     } else if (type == "leave_resp") {
-        qDebug() << "[Network] leave response:" << code;
     } else if (type == "presence_push") {
         emit presenceChanged(response.value("username").toString(), response.value("online").toBool());
     } else if (type == "contacts_resp") {
-        qDebug() << "[Network] contacts received:" << response.value("contacts").toArray().size();
         emit contactsReceived(response.value("contacts").toArray());
     } else if (type == "friend_request_resp") {
-        qDebug() << "[Network] friend request result:" << code << message;
     } else if (type == "friend_request_push") {
         const QJsonObject request = response.value("request").toObject();
         emit friendRequestReceived(request.value("sender").toString(),
@@ -254,7 +244,6 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
                                    request.value("avatarSeed").toInt());
     } else if (type == "friend_requests_resp") {
         const QJsonArray requests = response.value("requests").toArray();
-        qDebug() << "[Network] pending friend requests received:" << requests.size();
         for (const QJsonValue& value : requests) {
             const QJsonObject request = value.toObject();
             emit friendRequestReceived(request.value("sender").toString(),
@@ -265,7 +254,6 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
         if (code == 0)
             requestContacts();
     } else if (type == "friend_accepted_push") {
-        qDebug() << "[Network] friend request accepted by:" << response.value("username").toString();
         requestContacts();
     } else if (type == "call_signal_resp") {
         emit callSignalSendResult(response.value("signalType").toString(), code, message);
@@ -274,8 +262,6 @@ void NetworkManager::dispatchResponse(const QByteArray& payload) {
                || type == "peer_disconnected" || type == "call_ended"
                || type == "webrtc_offer" || type == "webrtc_answer"
                || type == "ice_candidate") {
-        qDebug() << "[Network] call signal received:" << type
-                 << "from=" << response.value("from").toString();
         emit callSignalReceived(response.toVariantMap());
     } else if (type == "chat_resp") {
         const QJsonObject chatMessage = response.value("message").toObject();

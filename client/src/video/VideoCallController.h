@@ -28,7 +28,7 @@ public:
     QString callId() const;
 
     void startOutgoingCall(const QString& peer);
-    void receiveIncomingCall(const QString& peer);
+    void receiveIncomingCall(const QString& peer, const QString& callId);
     void acceptIncomingCall();
     void rejectIncomingCall();
     void handleRemoteSignal(const QVariantMap& signal);
@@ -51,6 +51,7 @@ private slots:
 private:
     void setState(CallState nextState);
     void finishCall();
+    bool belongsToCurrentCall(const QVariantMap& signal) const;
     QString generateCallId();
     void startCallTimeout();
     void stopCallTimeout();

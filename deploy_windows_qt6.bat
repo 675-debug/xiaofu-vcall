@@ -54,6 +54,8 @@ if errorlevel 1 goto :fail
 
 copy /y "%APP_EXE%" "%DIST_DIR%\" >nul
 if errorlevel 1 goto :fail
+copy /y "%ROOT%client\asr.url" "%DIST_DIR%\asr.url" >nul
+if errorlevel 1 goto :fail
 
 echo [deploy] Running windeployqt --release --compiler-runtime ...
 call "%VS_VARS%" x64 %SDK_VER% >nul 2>&1
@@ -73,6 +75,7 @@ call :check "%DIST_DIR%\Qt6Network.dll"
 call :check "%DIST_DIR%\Qt6WebChannel.dll"
 call :check "%DIST_DIR%\Qt6WebEngineCore.dll"
 call :check "%DIST_DIR%\Qt6WebEngineWidgets.dll"
+call :check "%DIST_DIR%\asr.url"
 if exist "%DIST_DIR%\Qt6Multimedia.dll" (
     echo [deploy] OK: %DIST_DIR%\Qt6Multimedia.dll
 ) else (

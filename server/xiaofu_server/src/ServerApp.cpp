@@ -195,43 +195,11 @@ void ServerApp::removeConnection(int fd)
     const std::uint64_t connectionId = iterator->second->id();
     const std::int64_t now = steadyNowMs();
 
-    // --- P0: cleanup all active call sessions for this user ---
     if (!username.empty()) {
-        Log::info("=== CLIENT DISCONNECTED === username=" + username
+        Log::info("client disconnected username=" + username
                   + " fd=" + std::to_string(fd)
                   + " connId=" + std::to_string(connectionId));
-
-        // Find and end all active calls for this user
-        const CallSession* active = callManager.findActiveForUser(username);
-        std::string activeCallId;
-        if (active) activeCallId = active->callId;
-
-        auto endedCallIds = callManager.endAllForUser(username, "disconnected", now);
-
-        for (const auto& cid : endedCallIds) {
-            const CallSession* cs = callManager.findByCallId(cid);
-            if (!cs) continue;
-            const std::string peer = cs->otherUser(username);
-
-            Log::info("[CALL " + cid + "][CLEANUP] reason=PEER_DISCONNECTED"
-                      + std::string(" state=ended user=") + username
-                      + " peer=" + peer);
-
-            // Notify peer if still online
-            const int peerFd = joinHandler.fdOf(peer);
-            if (peerFd >= 0) {
-                const auto peerConnIt = connections.find(peerFd);
-                if (peerConnIt != connections.end()) {
-                    JsonValue notify;
-                    notify.set("type", JsonValue("call_ended"));
-                    notify.set("callId", JsonValue(cid));
-                    notify.set("reason", JsonValue("PEER_DISCONNECTED"));
-                    notify.set("peer", JsonValue(username));
-                    sendTo(peerConnIt->second->id(), notify.serialize());
-                    Log::info("[CALL " + cid + "][CLEANUP] peer_notified=" + peer);
-                }
-            }
-        }
+        cleanupCallsForUser(username, now, "PEER_DISCONNECTED");
     } else {
         Log::info("client disconnected fd=" + std::to_string(fd)
                   + " connId=" + std::to_string(connectionId) + " (no username)");
@@ -325,15 +293,6 @@ std::string ServerApp::generateCallId()
                   1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday,
                   nextCallSeq++);
     return buf;
-}
-
-std::string ServerApp::callIdForPair(const std::string& userA, const std::string& userB)
-{
-    const CallSession* cs = callManager.findActiveForUser(userA);
-    if (cs && cs->hasParticipant(userB)) return cs->callId;
-    cs = callManager.findActiveForUser(userB);
-    if (cs && cs->hasParticipant(userA)) return cs->callId;
-    return userA + "-" + userB;
 }
 
 void ServerApp::cleanupCallsForUser(const std::string& username, std::int64_t nowMs,
@@ -447,6 +406,16 @@ ServerApp::SignalResult ServerApp::validateCallSignal(
     return SignalResult::Ok;
 }
 
+bool ServerApp::isSignalRoleAllowed(const std::string& type, const std::string& from,
+                                    const CallSession& session) const
+{
+    if (type == "call_accept" || type == "call_reject")
+        return from == session.callee;
+    if (type == "call_cancel")
+        return from == session.caller;
+    return true;
+}
+
 // ============================================================
 //  Call history persistence
 // ============================================================
@@ -471,17 +440,26 @@ void ServerApp::persistCallRecord(const CallSession& session) {
     }
 }
 
-void ServerApp::handleCallConnected(std::uint64_t /*connectionId*/,
+void ServerApp::handleCallConnected(std::uint64_t connectionId,
+                                     const std::string& username,
                                      const std::string& callId, std::int64_t nowMs)
 {
     CallSession* cs = callManager.findByCallId(callId);
-    if (!cs || cs->isEnded()) return;
+    if (username.empty() || !cs || cs->isEnded() || !cs->hasParticipant(username)) {
+        sendTo(connectionId, makeResponse("call_connected_resp", ResultCode::NotCallParticipant,
+                                          "invalid call participant"));
+        return;
+    }
     // Only allow connecting → connected
     if (cs->state == "connecting") {
         cs->state = "connected";
         cs->connectedAt = nowMs;
         Log::info("[CALL " + callId + "] state connecting -> connected");
+        sendTo(connectionId, makeResponse("call_connected_resp", ResultCode::Ok, "ok"));
+        return;
     }
+    sendTo(connectionId, makeResponse("call_connected_resp", ResultCode::InvalidCallState,
+                                      "invalid state for this operation"));
 }
 
 void ServerApp::handleCallHistory(std::uint64_t connectionId, const std::string& username)
@@ -576,7 +554,7 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
             sendTo(connectionId, makeResponse("leave_resp", ResultCode::Failed, "join required"));
             return;
         }
-        cleanupCallsForUser(username, now, "disconnected");
+        cleanupCallsForUser(username, now, "PEER_LEFT");
         joinHandler.removeConnection(fd);
         sendTo(connectionId, makeResponse("leave_resp", ResultCode::Ok, "ok"));
         broadcastPresence(username, false);
@@ -888,8 +866,7 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
     // --------------- call_connected ---------------
     if (type == "call_connected") {
         const std::string callId = request.get("callId").asString();
-        handleCallConnected(connectionId, callId, now);
-        sendTo(connectionId, makeResponse("call_connected_resp", ResultCode::Ok, "ok"));
+        handleCallConnected(connectionId, currentUsername, callId, now);
         return;
     }
 
@@ -974,8 +951,7 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
         }
 
         // --- all other signals need a callId ---
-        // derive callId from sender/receiver pair
-        const std::string callId = callIdForPair(currentUsername, receiver);
+        const std::string callId = request.get("callId").asString();
         const CallSession* session = callManager.findByCallId(callId);
 
         // Validate
@@ -1008,6 +984,15 @@ void ServerApp::handleMessage(std::uint64_t connectionId, const std::string& mes
                        + (session ? session->state : "?"));
             sendTo(connectionId, makeResponse("call_signal_resp", ResultCode::InvalidCallState,
                                                "invalid state for this operation"));
+            return;
+        }
+
+        if (session && !isSignalRoleAllowed(type, currentUsername, *session)) {
+            Log::warn("[CALL " + callId + "][SIGNAL] type=" + type
+                      + " from=" + currentUsername + " IGNORED reason=WRONG_ROLE");
+            sendTo(connectionId, makeResponse("call_signal_resp",
+                                               ResultCode::NotCallParticipant,
+                                               "invalid role for this operation"));
             return;
         }
 

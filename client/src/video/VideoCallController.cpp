@@ -99,11 +99,14 @@ void VideoCallController::startOutgoingCall(const QString& peerName) {
                             {QStringLiteral("callId"), currentCallId}});
 }
 
-void VideoCallController::receiveIncomingCall(const QString& peerName) {
-    if (peerName.isEmpty() || currentState != Idle)
+void VideoCallController::receiveIncomingCall(const QString& peerName, const QString& callId) {
+    if (peerName.isEmpty() || callId.isEmpty() || currentState != Idle) {
+        qWarning().noquote() << "[Call] ignore invalid incoming call peer=" << peerName
+                             << "callId=" << callId;
         return;
+    }
 
-    currentCallId = generateCallId();
+    currentCallId = callId;
     currentPeer = peerName;
     emit peerChanged(currentPeer);
     setState(IncomingRinging);
@@ -163,14 +166,15 @@ void VideoCallController::handleRemoteSignal(const QVariantMap& signal) {
     else
         qDebug().noquote() << "[Call] signal received:" << type << sessionTag;
 
-    // 对端主动取消来电：只关闭本地来电 UI，不向对端回发任何信令。
+    // 对端主动取消来电：只关闭当前来电 UI，不向对端回发任何信令。
     if (type == QStringLiteral("call_cancel")) {
-        if (currentState == IncomingRinging) {
+        if (currentState == IncomingRinging && belongsToCurrentCall(signal)) {
             qDebug().noquote() << "[Call] caller cancelled, close incoming UI";
             stopCallTimeout();
             if (bridge)
                 bridge->stopCall();
             finishCall();
+            emit callEndedByPeer();
         }
         return;
     }
@@ -184,7 +188,13 @@ void VideoCallController::handleRemoteSignal(const QVariantMap& signal) {
         return;
     }
 
-    if (type == QStringLiteral("call_reject") || type == QStringLiteral("call_hangup")) {
+    const bool remoteEnded = type == QStringLiteral("call_reject")
+                             || type == QStringLiteral("call_hangup")
+                             || type == QStringLiteral("peer_disconnected")
+                             || type == QStringLiteral("call_ended");
+    if (remoteEnded) {
+        if (currentState == Idle || !belongsToCurrentCall(signal))
+            return;
         stopCallTimeout();
         qDebug() << "[Call] call ended by peer:" << type;
         // 收到对端挂断必须关闭本地轨道，避免摄像头在回到聊天页后仍被占用。
@@ -197,6 +207,15 @@ void VideoCallController::handleRemoteSignal(const QVariantMap& signal) {
 
     if (bridge)
         bridge->applyRemoteSignal(signal);
+}
+
+bool VideoCallController::belongsToCurrentCall(const QVariantMap& signal) const {
+    const QString peerName = signal.value(QStringLiteral("from")).toString();
+    const QString signalCallId = signal.value(QStringLiteral("callId")).toString();
+    if (!peerName.isEmpty() && peerName != currentPeer)
+        return false;
+    // 兼容现有未携带 callId 的结束推送；携带时必须与当前会话一致。
+    return signalCallId.isEmpty() || signalCallId == currentCallId;
 }
 
 void VideoCallController::endCall() {

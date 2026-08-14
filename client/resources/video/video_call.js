@@ -100,10 +100,6 @@
         X.ice.setIcePolicy(policy);
     }
 
-    function setDiagFilter() {
-        X.ice.setDiagFilter();
-    }
-
     function setDiagMaxDumps(value) {
         X.stats.setDiagMaxDumps(value);
     }
@@ -276,7 +272,7 @@
         };
     }
 
-    // 实时字幕：C++ 桥在页面加载后注入 FunASR WebSocket 服务地址（默认已指向云服务器）。
+    // 实时字幕：C++ 桥注入 XIAOFU_ASR_URL 或 exe 同目录 asr.url；未配置时保持不可用。
     function setSubtitleUrl(url) {
         if (X.subtitle && X.subtitle.setUrl) {
             X.subtitle.setUrl(url);
@@ -304,7 +300,6 @@
         setMicEnabled: setMicEnabled,
         setIceServers: setIceServers,
         setIcePolicy: setIcePolicy,
-        setDiagFilter: setDiagFilter,
         setDiagMaxDumps: setDiagMaxDumps,
         setSubtitleUrl: setSubtitleUrl,
         recorderToggle: recorderToggle,

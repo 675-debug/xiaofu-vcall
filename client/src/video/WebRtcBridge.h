@@ -28,10 +28,6 @@ public:
     void setIcePolicy(const QString& policy);
     // 页面加载完成后把 C++ 侧暂存的 ICE 策略推送给 JS。
     void applyIcePolicy();
-    // 配置候选诊断过滤模式：'ipv4-udp-host-only'/'no-ipv6'/'no-tcp'（诊断候选路径问题），空/其他值恢复默认。
-    void setDiagFilter(const QString& mode);
-    // 页面加载完成后把 C++ 侧暂存的诊断过滤模式推送给 JS。
-    void applyDiagFilter();
     // 实时字幕 FunASR WebSocket 服务地址，页面加载完成后注入 JS。
     void setSubtitleUrl(const QString& url);
     // 页面加载完成后把 C++ 侧暂存的字幕服务地址推送给 JS。
@@ -61,7 +57,6 @@ private:
     QPointer<QWebEnginePage> page;
     QVariantList pendingIceServers;
     QString pendingIcePolicy;
-    QString pendingDiagFilter;
     QString pendingSubtitleUrl;
 };
 

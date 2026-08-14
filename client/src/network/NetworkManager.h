@@ -6,6 +6,7 @@
 #include <QTcpSocket>
 
 class QTimer;
+class QJsonObject;
 
 class NetworkManager : public QObject {
     Q_OBJECT
@@ -61,6 +62,7 @@ private slots:
 
 private:
     void sendFrame(const QByteArray& payload);
+    void sendJson(const QJsonObject& request);
     void parseFrames();
     void dispatchResponse(const QByteArray& payload);
 

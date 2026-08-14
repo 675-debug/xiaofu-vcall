@@ -18,10 +18,7 @@
 #include <QPaintEvent>
 #include <QTime>
 #include <QJsonArray>
-#include <QInputDialog>
 #include <QLineEdit>
-#include <QDialog>
-#include <QPushButton>
 #include <QSettings>
 #include <QFileDialog>
 
@@ -297,75 +294,29 @@ void MainWidget::on_btnAddContact_clicked() {
                              QStringLiteral("当前未连接到服务器，请重新登录后再试。"));
         return;
     }
-    const QString username = showAddContactDialog();
-    if (!username.isEmpty()) {
-        qDebug() << "[Main] friend request:" << username;
-        networkManager->addContact(username);
-    }
+    ui->editAddContact->clear();
+    ui->addContactMask->setGeometry(rect());
+    ui->addContactPanel->move((width() - ui->addContactPanel->width()) / 2,
+                              (height() - ui->addContactPanel->height()) / 2);
+    ui->addContactMask->raise();
+    ui->addContactMask->show();
+    ui->editAddContact->setFocus();
 }
 
-QString MainWidget::showAddContactDialog() {
-    QDialog dialog(this);
-    dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    dialog.setModal(true);
-    dialog.setFixedSize(420, 260);
-    dialog.setAttribute(Qt::WA_StyledBackground, true);
-    dialog.setStyleSheet(
-        "QDialog{background:#FFFFFF;border:1px solid #C7C7CC;border-radius:14px;}"
-        "QLabel{background:transparent;}"
-        "QLineEdit{min-height:40px;border:1.5px solid #E8E8ED;border-radius:10px;padding:0 12px;font-size:14px;background:#FAFAFA;color:#1A1A2E;}"
-        "QLineEdit:focus{border-color:#007AFF;background:#FFFFFF;}"
-        "QPushButton{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}"
-        "QPushButton#cancelButton{background:#F4F4F6;color:#5C5C66;border:1px solid #D9D9DE;}"
-        "QPushButton#cancelButton:hover{background:#E9E9ED;}"
-        "QPushButton#addButton{background:#007AFF;color:#FFFFFF;border:none;}"
-        "QPushButton#addButton:hover{background:#006CE6;}"
-        "QPushButton#addButton:disabled{background:#A8CFFF;color:#F7FAFF;}");
+void MainWidget::on_btnAddContactCancel_clicked() {
+    ui->addContactMask->hide();
+}
 
-    auto* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(28, 24, 28, 24);
-    layout->setSpacing(14);
+void MainWidget::on_btnAddContactConfirm_clicked() {
+    const QString username = ui->editAddContact->text().trimmed();
+    if (username.isEmpty() || !networkManager)
+        return;
+    ui->addContactMask->hide();
+    networkManager->addContact(username);
+}
 
-    auto* title = new QLabel(QStringLiteral("添加联系人"), &dialog);
-    title->setStyleSheet("font-size:17px;font-weight:700;color:#1A1A2E;");
-    layout->addWidget(title);
-
-    auto* tip = new QLabel(QStringLiteral("输入对方账号，发送好友申请"), &dialog);
-    tip->setStyleSheet("font-size:13px;color:#5C5C66;");
-    layout->addWidget(tip);
-
-    auto* edit = new QLineEdit(&dialog);
-    edit->setPlaceholderText(QStringLiteral("请输入对方账号"));
-    edit->setClearButtonEnabled(true);
-    layout->addWidget(edit);
-    layout->addStretch();
-
-    auto* buttonRow = new QHBoxLayout;
-    buttonRow->setSpacing(10);
-    auto* cancelButton = new QPushButton(QStringLiteral("取消"), &dialog);
-    cancelButton->setObjectName("cancelButton");
-    auto* addButton = new QPushButton(QStringLiteral("添加"), &dialog);
-    addButton->setObjectName("addButton");
-    addButton->setEnabled(false);
-    buttonRow->addStretch();
-    buttonRow->addWidget(cancelButton);
-    buttonRow->addWidget(addButton);
-    layout->addLayout(buttonRow);
-
-    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
-    connect(addButton, &QPushButton::clicked, &dialog, &QDialog::accept);
-    connect(edit, &QLineEdit::textChanged, &dialog, [addButton](const QString& text) {
-        addButton->setEnabled(!text.trimmed().isEmpty());
-    });
-    connect(edit, &QLineEdit::returnPressed, addButton, &QPushButton::click);
-
-    QString username;
-    connect(addButton, &QPushButton::clicked, &dialog, [&username, edit]() {
-        username = edit->text().trimmed();
-    });
-
-    dialog.exec();
-    return username;
+void MainWidget::on_editAddContact_textChanged(const QString& text) {
+    ui->btnAddContactConfirm->setEnabled(!text.trimmed().isEmpty());
 }
 
 
@@ -554,64 +505,34 @@ void MainWidget::onChatSendResult(const QString& peer, bool online, int code, co
 void MainWidget::onFriendRequestReceived(const QString& sender, const QString& nickname, int avatarSeed) {
     if (sender.isEmpty())
         return;
-    showFriendRequestDialog(sender, nickname.isEmpty() ? sender : nickname, avatarSeed);
+    showFriendRequestPanel(sender, nickname.isEmpty() ? sender : nickname, avatarSeed);
 }
 
-void MainWidget::showFriendRequestDialog(const QString& sender, const QString& nickname, int avatarSeed) {
-    QDialog dialog(this);
-    dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    dialog.setModal(true);
-    dialog.setFixedSize(390, 236);
-    dialog.setAttribute(Qt::WA_StyledBackground, true);
-    dialog.setStyleSheet(
-        "QDialog{background:#FFFFFF;border:1px solid #C7C7CC;border-radius:14px;}"
-        "QLabel{background:transparent;color:#1A1A2E;}"
-        "QPushButton{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}"
-        "QPushButton#rejectButton{background:#F4F4F6;color:#5C5C66;border:1px solid #D9D9DE;}"
-        "QPushButton#rejectButton:hover{background:#E9E9ED;}"
-        "QPushButton#acceptButton{background:#007AFF;color:#FFFFFF;border:none;}"
-        "QPushButton#acceptButton:hover{background:#006CE6;}");
+void MainWidget::showFriendRequestPanel(const QString& sender, const QString& nickname, int avatarSeed) {
+    pendingFriendRequestSender = sender;
+    ui->friendRequestAvatar->setText(nickname.left(1).toUpper());
+    ui->friendRequestAvatar->setStyleSheet(QStringLiteral("background:%1;").arg(avatarColor(avatarSeed)));
+    ui->friendRequestDescription->setText(
+        QStringLiteral("%1 请求添加你为好友\n账号：%2").arg(nickname, sender));
+    ui->friendRequestMask->setGeometry(rect());
+    ui->friendRequestPanel->move((width() - ui->friendRequestPanel->width()) / 2,
+                                 (height() - ui->friendRequestPanel->height()) / 2);
+    ui->friendRequestMask->raise();
+    ui->friendRequestMask->show();
+}
 
-    auto* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(28, 24, 28, 24);
-    layout->setSpacing(12);
-    auto* title = new QLabel(QStringLiteral("好友申请"), &dialog);
-    title->setStyleSheet("font-size:17px;font-weight:700;color:#1A1A2E;");
-    layout->addWidget(title);
+void MainWidget::on_btnFriendReject_clicked() {
+    ui->friendRequestMask->hide();
+    if (networkManager && !pendingFriendRequestSender.isEmpty())
+        networkManager->respondToFriendRequest(pendingFriendRequestSender, false);
+    pendingFriendRequestSender.clear();
+}
 
-    auto* profileRow = new QHBoxLayout;
-    profileRow->setSpacing(14);
-    auto* avatar = new QLabel(nickname.left(1).toUpper(), &dialog);
-    avatar->setFixedSize(52, 52);
-    avatar->setAlignment(Qt::AlignCenter);
-    avatar->setStyleSheet(QString("background:%1;color:#FFFFFF;border-radius:26px;font-size:18px;font-weight:700;")
-                              .arg(avatarColor(avatarSeed)));
-    auto* description = new QLabel(QStringLiteral("%1 请求添加你为好友\n账号：%2").arg(nickname, sender), &dialog);
-    description->setStyleSheet("font-size:13px;line-height:20px;color:#5C5C66;");
-    profileRow->addWidget(avatar);
-    profileRow->addWidget(description, 1);
-    layout->addLayout(profileRow);
-    layout->addStretch();
-
-    auto* buttonRow = new QHBoxLayout;
-    buttonRow->setSpacing(10);
-    auto* rejectButton = new QPushButton(QStringLiteral("拒绝"), &dialog);
-    rejectButton->setObjectName("rejectButton");
-    auto* acceptButton = new QPushButton(QStringLiteral("接受"), &dialog);
-    acceptButton->setObjectName("acceptButton");
-    buttonRow->addWidget(rejectButton);
-    buttonRow->addWidget(acceptButton);
-    layout->addLayout(buttonRow);
-
-    bool accepted = false;
-    connect(rejectButton, &QPushButton::clicked, &dialog, &QDialog::reject);
-    connect(acceptButton, &QPushButton::clicked, &dialog, [&dialog, &accepted]() {
-        accepted = true;
-        dialog.accept();
-    });
-    dialog.exec();
-    if (networkManager)
-        networkManager->respondToFriendRequest(sender, accepted);
+void MainWidget::on_btnFriendAccept_clicked() {
+    ui->friendRequestMask->hide();
+    if (networkManager && !pendingFriendRequestSender.isEmpty())
+        networkManager->respondToFriendRequest(pendingFriendRequestSender, true);
+    pendingFriendRequestSender.clear();
 }
 
 void MainWidget::filterContactList(QListWidget* list, const QString& keyword) {

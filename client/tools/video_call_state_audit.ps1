@@ -17,6 +17,21 @@ foreach ($state in @('Idle', 'OutgoingRinging', 'IncomingRinging', 'Connecting',
     }
 }
 
+if ($header -notmatch 'receiveIncomingCall\s*\(\s*const QString&\s+\w+\s*,\s*const QString&\s+callId\s*\)') {
+    throw '来电入口必须接收服务端下发的 callId'
+}
+
+if ($callWidgetSource -notmatch 'signal\.value\(QStringLiteral\("callId"\)\)\.toString\(\)' -or
+    $callWidgetSource -notmatch 'receiveIncomingCall\s*\(\s*peerName\s*,\s*callId\s*\)') {
+    throw 'CallWidget 未把 call_request 的 callId 原样传给控制器'
+}
+
+foreach ($endSignal in @('call_cancel', 'call_reject', 'call_hangup', 'peer_disconnected', 'call_ended')) {
+    if (-not $source.Contains($endSignal)) {
+        throw "通话控制器缺少远端结束事件: $endSignal"
+    }
+}
+
 if ($source -notmatch 'call_hangup[\s\S]{0,1000}stopCall\(\)') {
     throw '收到 call_hangup 后未停止 WebRTC 媒体资源'
 }

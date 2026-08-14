@@ -1430,6 +1430,36 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
     </layout>
    </widget>
   </widget>
+  <widget class="QFrame" name="addContactMask">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1650</width><height>1000</height></rect></property>
+   <property name="visible"><bool>false</bool></property>
+   <property name="styleSheet"><string notr="true">#addContactMask{background:rgba(0,0,0,60);}#addContactPanel{background:#FFFFFF;border:1px solid #C7C7CC;border-radius:14px;}#addContactTitle{font-size:17px;font-weight:700;color:#1A1A2E;}#addContactTip{font-size:13px;color:#5C5C66;}#editAddContact{min-height:40px;border:1.5px solid #E8E8ED;border-radius:10px;padding:0 12px;font-size:14px;background:#FAFAFA;color:#1A1A2E;}#editAddContact:focus{border-color:#007AFF;background:#FFFFFF;}#btnAddContactCancel,#btnAddContactConfirm{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}#btnAddContactCancel{background:#F4F4F6;color:#5C5C66;border:1px solid #D9D9DE;}#btnAddContactCancel:hover{background:#E9E9ED;}#btnAddContactCancel:pressed{background:#DDDEE3;}#btnAddContactConfirm{background:#007AFF;color:#FFFFFF;border:none;}#btnAddContactConfirm:hover{background:#006CE6;}#btnAddContactConfirm:pressed{background:#0051A8;}#btnAddContactConfirm:disabled{background:#A8CFFF;color:#F7FAFF;}</string></property>
+   <widget class="QFrame" name="addContactPanel">
+    <property name="geometry"><rect><x>615</x><y>370</y><width>420</width><height>260</height></rect></property>
+    <layout class="QVBoxLayout" name="addContactLayout">
+     <property name="leftMargin"><number>28</number></property><property name="topMargin"><number>24</number></property><property name="rightMargin"><number>28</number></property><property name="bottomMargin"><number>24</number></property><property name="spacing"><number>14</number></property>
+     <item><widget class="QLabel" name="addContactTitle"><property name="text"><string>添加联系人</string></property></widget></item>
+     <item><widget class="QLabel" name="addContactTip"><property name="text"><string>输入对方账号，发送好友申请</string></property></widget></item>
+     <item><widget class="QLineEdit" name="editAddContact"><property name="placeholderText"><string>请输入对方账号</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item>
+     <item><spacer name="addContactSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+     <item><layout class="QHBoxLayout" name="addContactButtons"><property name="spacing"><number>10</number></property><item><spacer name="addContactButtonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item><item><widget class="QPushButton" name="btnAddContactCancel"><property name="text"><string>取消</string></property></widget></item><item><widget class="QPushButton" name="btnAddContactConfirm"><property name="enabled"><bool>false</bool></property><property name="text"><string>添加</string></property></widget></item></layout></item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QFrame" name="friendRequestMask">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1650</width><height>1000</height></rect></property>
+   <property name="visible"><bool>false</bool></property>
+   <property name="styleSheet"><string notr="true">#friendRequestMask{background:rgba(0,0,0,60);}#friendRequestPanel{background:#FFFFFF;border:1px solid #C7C7CC;border-radius:14px;}#friendRequestTitle{font-size:17px;font-weight:700;color:#1A1A2E;}#friendRequestAvatar{color:#FFFFFF;border-radius:26px;font-size:18px;font-weight:700;}#friendRequestDescription{font-size:13px;color:#5C5C66;}#btnFriendReject,#btnFriendAccept{min-height:38px;border-radius:9px;padding:0 22px;font-size:13px;font-weight:600;}#btnFriendReject{background:#F4F4F6;color:#5C5C66;border:1px solid #D9D9DE;}#btnFriendReject:hover{background:#E9E9ED;}#btnFriendReject:pressed{background:#DDDEE3;}#btnFriendAccept{background:#007AFF;color:#FFFFFF;border:none;}#btnFriendAccept:hover{background:#006CE6;}#btnFriendAccept:pressed{background:#0051A8;}</string></property>
+   <widget class="QFrame" name="friendRequestPanel">
+    <property name="geometry"><rect><x>630</x><y>382</y><width>390</width><height>236</height></rect></property>
+    <layout class="QVBoxLayout" name="friendRequestLayout"><property name="leftMargin"><number>28</number></property><property name="topMargin"><number>24</number></property><property name="rightMargin"><number>28</number></property><property name="bottomMargin"><number>24</number></property><property name="spacing"><number>12</number></property>
+     <item><widget class="QLabel" name="friendRequestTitle"><property name="text"><string>好友申请</string></property></widget></item>
+     <item><layout class="QHBoxLayout" name="friendRequestProfile"><property name="spacing"><number>14</number></property><item><widget class="QLabel" name="friendRequestAvatar"><property name="minimumSize"><size><width>52</width><height>52</height></size></property><property name="maximumSize"><size><width>52</width><height>52</height></size></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="text"><string>用</string></property></widget></item><item><widget class="QLabel" name="friendRequestDescription"><property name="text"><string>用户请求添加你为好友</string></property><property name="wordWrap"><bool>true</bool></property></widget></item></layout></item>
+     <item><spacer name="friendRequestSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+     <item><layout class="QHBoxLayout" name="friendRequestButtons"><property name="spacing"><number>10</number></property><item><widget class="QPushButton" name="btnFriendReject"><property name="text"><string>拒绝</string></property></widget></item><item><widget class="QPushButton" name="btnFriendAccept"><property name="text"><string>接受</string></property></widget></item></layout></item>
+    </layout>
+   </widget>
+  </widget>
  </widget>
  <resources>
   <include location="../resources.qrc"/>

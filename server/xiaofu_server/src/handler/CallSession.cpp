@@ -6,7 +6,8 @@ CallSession* CallSessionManager::create(const std::string& callId,
                                          const std::string& callee, std::uint64_t calleeConnId,
                                          std::int64_t nowMs)
 {
-    if (callId.empty() || caller.empty() || callee.empty() || caller == callee)
+    if (callId.empty() || caller.empty() || callee.empty() || caller == callee
+        || sessions_.count(callId) != 0)
         return nullptr;
     CallSession s;
     s.callId = callId;

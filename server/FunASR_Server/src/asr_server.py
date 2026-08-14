@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""FunASR_Server: 本机回环 WebSocket Streaming ASR (paraformer-zh-streaming, CPU).
+"""FunASR_Server: WebSocket Streaming ASR (paraformer-zh-streaming, CPU).
 
 协议 (与 client/resources/video/webrtc/subtitle.js 兼容):
   - 连接后客户端先发 JSON handshake: {mode, chunk_size, encoder_chunk_look_back,
@@ -88,6 +88,7 @@ class AsrServer:
         self.max_connections = max_connections
         self.max_pcm_samples = max_pcm_samples
         self.active_conns = set()      # 当前活跃连接集合 (<= max_connections)
+        self.infer_lock = asyncio.Lock()  # AutoModel 共享实例串行调用
         self.stopping = False
         self.proc = psutil.Process(os.getpid())
         self._cpu_baseline = None
@@ -147,8 +148,11 @@ class AsrServer:
         return text, dt
 
     async def infer(self, ws, st, pcm_bytes, is_final):
-        text, dt = await asyncio.get_event_loop().run_in_executor(
-            None, self._infer_sync, st, pcm_bytes, is_final)
+        # 每个连接有独立 cache，但共享 AutoModel 是否线程安全没有保证。
+        # 2C4G 部署下串行推理也能避免多个模型调用同时抢占内存和 CPU。
+        async with self.infer_lock:
+            text, dt = await asyncio.get_running_loop().run_in_executor(
+                None, self._infer_sync, st, pcm_bytes, is_final)
         return text, dt
 
     # ---------- 消息处理 ----------
@@ -171,9 +175,9 @@ class AsrServer:
             return
 
         if not st.handshaken:
-            if "mode" not in msg:
+            if msg.get("mode") != "online":
                 await self.send_error(ws, "no_handshake",
-                                      "handshake required: {\"mode\": \"online\", ...}")
+                                      "handshake requires mode=online")
                 return
             st.wav_name = str(msg.get("wav_name", "remote"))
             st.handshaken = True
@@ -206,8 +210,8 @@ class AsrServer:
             chunk = bytes(st.pcm[:CHUNK_SAMPLES * 2])
             del st.pcm[:CHUNK_SAMPLES * 2]
             text, dt = await self.infer(ws, st, chunk, is_final=False)
-            log.info("chunk=%d infer=%.3fs text=%r backlog=%dB",
-                     st.chunk_count, dt, text, len(st.pcm))
+            log.debug("chunk=%d infer=%.3fs text=%r backlog=%dB",
+                      st.chunk_count, dt, text, len(st.pcm))
             await self.send_json(ws, {"type": "partial", "text": st.cumulative_text()})
 
         # 资源保护: 消费速度不足时不允许无限缓存
@@ -238,6 +242,11 @@ class AsrServer:
                 log.info("final tail padded %d -> %d samples", n, FINAL_MIN_SAMPLES)
             text, dt = await self.infer(ws, st, tail, is_final=True)
             log.info("final infer=%.3fs text=%r", dt, text)
+        elif st.chunk_count > 0:
+            # 没有剩余 PCM 时仍需触发 is_final，让流式模型冲刷 cache。
+            tail = b"\x00\x00" * FINAL_MIN_SAMPLES
+            text, dt = await self.infer(ws, st, tail, is_final=True)
+            log.info("final flush infer=%.3fs text=%r", dt, text)
 
         final_text = st.cumulative_text()
         log.info("FINAL wav=%s text=%r", st.wav_name, final_text)

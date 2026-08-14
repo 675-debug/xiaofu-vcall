@@ -176,30 +176,6 @@ QString iceTransportPolicyFromEnv() {
 
 
 
-// 读取候选诊断过滤模式环境变量：XIAOFU_DIAG_CAND_FILTER=ipv4-udp-host-only|no-ipv6|no-tcp。
-
-// 用于临时隔离 IPv6/TCP/srflx/relay 候选，定位“ICE connected 但媒体路径错误”的场景；其他值返回空(默认 none)。
-
-QString diagCandidateFilterFromEnv() {
-
-    const QString mode = qEnvironmentVariable("XIAOFU_DIAG_CAND_FILTER").trimmed().toLower();
-
-    if (mode == QLatin1String("ipv4-udp-host-only") ||
-
-        mode == QLatin1String("no-ipv6") ||
-
-        mode == QLatin1String("no-tcp")) {
-
-        return mode;
-
-    }
-
-    return QString();
-
-}
-
-
-
 // 实时字幕 FunASR WebSocket 地址（统一运行配置，部署地址只在这里维护一份）：
 
 //   1) 环境变量 XIAOFU_ASR_URL（开发/诊断 override，例如 ws://127.0.0.1:10095）
@@ -456,11 +432,13 @@ void CallWidget::setNetworkManager(NetworkManager* manager) {
 
         const QString peerName = signal.value(QStringLiteral("from")).toString();
 
+        const QString callId = signal.value(QStringLiteral("callId")).toString();
+
         qDebug().noquote() << "[Call] signal received:" << type << "from=" << peerName;
 
         if (type == QStringLiteral("call_request")) {
 
-            callController->receiveIncomingCall(peerName);
+            callController->receiveIncomingCall(peerName, callId);
 
             if (callController->state() == VideoCallController::IncomingRinging) {
 
@@ -841,14 +819,6 @@ void CallWidget::setupWebRtcView() {
 
     webRtcBridge->setIcePolicy(icePolicy);
 
-    const QString diagFilter = diagCandidateFilterFromEnv();
-
-    qDebug().noquote() << "[Call] XIAOFU_DIAG_CAND_FILTER ="
-
-                       << (diagFilter.isEmpty() ? QStringLiteral("(none, default)") : diagFilter);
-
-    webRtcBridge->setDiagFilter(diagFilter);
-
     const AsrUrlConfig asrUrl = resolveAsrUrl();
 
     qDebug().noquote() << "[Call] ASR_URL_SOURCE =" << asrUrl.source;
@@ -946,8 +916,6 @@ void CallWidget::setupWebRtcView() {
         webRtcBridge->applyIceServers();
 
         webRtcBridge->applyIcePolicy();
-
-        webRtcBridge->applyDiagFilter();
 
         webRtcBridge->applySubtitleUrl();
 

@@ -102,23 +102,6 @@ void WebRtcBridge::applyIcePolicy() {
     setIcePolicy(pendingIcePolicy);
 }
 
-void WebRtcBridge::setDiagFilter(const QString& mode) {
-    pendingDiagFilter = mode;
-    qDebug().noquote() << "[Call] diag candidate filter:"
-                       << (mode.isEmpty() ? QStringLiteral("none (default)") : mode);
-    if (!page)
-        return;
-    const QString modeJson = QStringLiteral("\"%1\"").arg(mode);
-    runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.setDiagFilter(%1);")
-                      .arg(modeJson));
-}
-
-void WebRtcBridge::applyDiagFilter() {
-    if (pendingDiagFilter.isEmpty())
-        return;
-    setDiagFilter(pendingDiagFilter);
-}
-
 void WebRtcBridge::setSubtitleUrl(const QString& url) {
     pendingSubtitleUrl = url;
     qDebug().noquote() << "[Call] subtitle asr url:" << url;

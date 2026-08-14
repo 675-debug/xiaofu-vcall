@@ -44,8 +44,6 @@ private:
 
     // --------------- CallSession management ---------------
     std::string generateCallId();
-    std::string callIdForPair(const std::string& userA, const std::string& userB);
-
     // Cleanup all calls for a disconnected user. Notifies peer if still online.
     void cleanupCallsForUser(const std::string& username, std::int64_t nowMs,
                              const std::string& reason);
@@ -71,10 +69,13 @@ private:
                                     const std::string& from,
                                     const std::string& to,
                                     const CallSession* session);
+    bool isSignalRoleAllowed(const std::string& type, const std::string& from,
+                             const CallSession& session) const;
 
     // --------------- Call history ---------------
     void persistCallRecord(const CallSession& session);
-    void handleCallConnected(std::uint64_t connectionId, const std::string& callId,
+    void handleCallConnected(std::uint64_t connectionId, const std::string& username,
+                             const std::string& callId,
                              std::int64_t nowMs);
     void handleCallHistory(std::uint64_t connectionId, const std::string& username);
 

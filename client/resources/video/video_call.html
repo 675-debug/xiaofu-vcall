@@ -5,72 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>视频通话</title>
     <style>
-        html, body { width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; overflow: hidden; background: #1a1a2e; }
-        #call-stage { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; background: #24243a; }
+        :root { color-scheme: dark; font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; overflow: hidden; background: #111827; }
+        #call-stage { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0;
+            background: radial-gradient(circle at 50% 35%, #263449 0%, #111827 72%); isolation: isolate; }
+        #call-stage::after { content: ""; position: absolute; inset: auto 0 0; height: 190px; z-index: 1200;
+            pointer-events: none; background: linear-gradient(transparent, rgba(4,8,16,.76)); }
         #call-stage:fullscreen, #call-stage:-webkit-full-screen { width: 100%; height: 100%; min-width: 0; min-height: 0; }
-        video { display: block; object-fit: cover; background: #2d2d44; }
+        video { display: block; object-fit: cover; background: #111827; }
         #remote-video { width: 100%; height: 100%; }
-        #local-pip { position: absolute; top: 16px; right: 26px; width: 220px; height: 300px;
-            border: 1px solid rgba(255,255,255,.32); border-radius: 14px; cursor: grab;
-            box-shadow: 0 10px 30px rgba(0,0,0,.28); overflow: hidden; background: #101018; }
+        #local-pip { position: absolute; top: clamp(12px, 2vw, 22px); right: clamp(12px, 2vw, 26px);
+            width: clamp(148px, 18vw, 260px); aspect-ratio: 16 / 9;
+            border: 1px solid rgba(255,255,255,.32); border-radius: 16px; cursor: grab;
+            box-shadow: 0 16px 42px rgba(0,0,0,.38); overflow: hidden; background: #0b1220; z-index: 1600; }
         #local-pip:active { cursor: grabbing; }
         #local-video { width: 100%; height: 100%; }
         #local-camera-overlay { position: absolute; inset: 0; display: flex; align-items: center;
             justify-content: center; color: rgba(255,255,255,.72); font: 13px "Microsoft YaHei UI", sans-serif;
             background: #101018; text-align: center; }
         #local-camera-overlay.hidden { display: none; }
-        #call-timer { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 1800;
-            background: rgba(0,0,0,.55); color: #FFFFFF; font: 13px "Microsoft YaHei UI", sans-serif;
-            padding: 4px 12px; border-radius: 12px; letter-spacing: .5px; display: none; }
-        #record-indicator { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 1800;
-            background: rgba(0,0,0,.55); color: #FFFFFF; font: 13px "Microsoft YaHei UI", sans-serif;
-            padding: 4px 12px; border-radius: 12px; letter-spacing: .5px; display: none; white-space: nowrap; }
+        #call-timer { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1800;
+            background: rgba(15,23,42,.72); color: #F8FAFC; font-size: 13px;
+            padding: 6px 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+            letter-spacing: .5px; display: none; backdrop-filter: blur(12px); }
+        #record-indicator { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); z-index: 1800;
+            background: rgba(15,23,42,.72); color: #F8FAFC; font-size: 13px;
+            padding: 6px 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+            letter-spacing: .5px; display: none; white-space: nowrap; backdrop-filter: blur(12px); }
         #record-indicator .rec-dot { color: #FF3B30; animation: rec-blink 1s linear infinite; }
         @keyframes rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: .15; } }
         #empty-state { position: absolute; inset: 0; display: flex; align-items: center;
             justify-content: center; color: rgba(255,255,255,.62); font: 14px "Microsoft YaHei UI", sans-serif; }
-        #call-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+        #call-controls { position: absolute; left: 0; right: 0; bottom: 14px; height: 58px;
             display: flex; align-items: center; justify-content: center; gap: 11px;
-            z-index: 2000; background: linear-gradient(transparent, rgba(0,0,0,.55));
+            z-index: 2000;
             pointer-events: none; }
         #call-controls button { margin: 0; }
-        #call-controls button { pointer-events: auto; width: 48px; height: 48px; padding: 0;
-            border: none; outline: none; border-radius: 50%; background: rgba(255,255,255,.18); color: #FFFFFF;
+        #call-controls button { pointer-events: auto; width: 52px; height: 52px; padding: 0;
+            border: 1px solid rgba(255,255,255,.14); border-radius: 50%; background: rgba(15,23,42,.76); color: #FFFFFF;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
-            box-shadow: none; -webkit-tap-highlight-color: transparent; }
-        #call-controls button:hover { background: rgba(255,255,255,.32); }
-        #call-controls button[data-active="false"] { opacity: .5; background: rgba(255,255,255,.1); }
-        #call-controls button:focus, #camera-profile-bar button:focus, #more-popover button:focus,
-        #call-controls button:active, #camera-profile-bar button:active, #more-popover button:active { outline: none; }
-        #call-controls button:focus-visible, #camera-profile-bar button:focus-visible, #more-popover button:focus-visible { outline: none; background: rgba(255,255,255,.28); }
-        #more-popover button:focus-visible { outline: none; background: rgba(0,0,0,.08); }
+            box-shadow: 0 8px 24px rgba(0,0,0,.22); -webkit-tap-highlight-color: transparent;
+            transition: background-color .18s ease, border-color .18s ease, transform .12s ease; }
+        #call-controls button:hover { background: rgba(51,65,85,.9); border-color: rgba(255,255,255,.24); }
+        #call-controls button:active { transform: translateY(1px); background: rgba(30,41,59,.96); }
+        #call-controls button[data-active="false"] { opacity: .56; background: rgba(15,23,42,.58); }
+        #call-controls button:focus-visible, #camera-profile-bar button:focus-visible, #more-popover button:focus-visible {
+            outline: 2px solid #60A5FA; outline-offset: 2px; }
         #more-popover button:disabled { opacity: .5; cursor: default; }
         #more-popover button:disabled:hover { background: transparent; }
         #call-controls button img { width: 24px; height: 24px; pointer-events: none; }
-        #hangup-button { background: #FF3B30; color: #FFFFFF; }
-        #hangup-button:hover { background: #E0352B; }
+        #hangup-button { background: #EF4444; border-color: rgba(255,255,255,.18); color: #FFFFFF; }
+        #hangup-button:hover { background: #DC2626; }
+        #hangup-button:active { background: #B91C1C; }
         #more-popover { position: absolute; z-index: 3000; min-width: 128px;
             bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-            background: #FFFFFF; color: #1A1A2E; border-radius: 8px;
-            box-shadow: none; -webkit-box-shadow: none; filter: none; border: 1px solid rgba(0,0,0,.08); padding: 4px; }
+            background: rgba(248,250,252,.98); color: #0F172A; border-radius: 12px;
+            box-shadow: 0 16px 40px rgba(0,0,0,.26); border: 1px solid rgba(255,255,255,.5); padding: 6px; }
         #more-popover button { pointer-events: auto; display: block; width: 100%;
             min-width: 0; height: 32px; padding: 0 10px; border: none; border-radius: 6px;
-            font-size: 12px; text-align: left; background: transparent; color: #1A1A2E; }
-        #more-popover button:hover { background: rgba(0,0,0,.06); }
+            font-size: 12px; text-align: left; background: transparent; color: #0F172A; cursor: pointer; }
+        #more-popover button:hover { background: #E2E8F0; }
+        #more-popover button:active { background: #CBD5E1; }
         #more-popover.hidden { display: none; }
-        #camera-profile-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 78px;
-            display: flex; align-items: center; gap: 8px; z-index: 1500;
-            background: rgba(0,0,0,.45); border-radius: 18px; padding: 6px 10px; }
+        #camera-profile-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 82px;
+            display: flex; align-items: center; gap: 4px; z-index: 1500;
+            background: rgba(15,23,42,.7); border: 1px solid rgba(255,255,255,.12);
+            border-radius: 999px; padding: 5px; backdrop-filter: blur(12px); }
         #camera-profile-bar button { pointer-events: auto; min-width: 72px; height: 30px; padding: 0 12px;
-            border: none; border-radius: 15px; font-size: 12px; background: rgba(255,255,255,.16);
-            color: #FFFFFF; cursor: pointer; }
-        #camera-profile-bar button:hover { background: rgba(255,255,255,.3); }
-        #camera-profile-bar button[data-active="true"] { background: #007AFF; color: #FFFFFF; font-weight: 600; }
+            border: none; border-radius: 999px; font-size: 12px; background: transparent;
+            color: #CBD5E1; cursor: pointer; transition: background-color .18s ease, color .18s ease; }
+        #camera-profile-bar button:hover { background: rgba(255,255,255,.12); color: #FFFFFF; }
+        #camera-profile-bar button:active { background: rgba(255,255,255,.18); }
+        #camera-profile-bar button[data-active="true"] { background: #2563EB; color: #FFFFFF; font-weight: 600; }
         #camera-profile-bar button:disabled { opacity: .5; cursor: default; }
-        #subtitle-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 119px;
-            max-width: 82%; z-index: 2200; background: rgba(0,0,0,.75); color: #FFFFFF;
-            font: 15px/1.5 "Microsoft YaHei UI", sans-serif; padding: 6px 14px; border-radius: 8px;
-            text-align: center; display: none; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #subtitle-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 132px;
+            width: fit-content; max-width: min(82%, 880px); z-index: 2200;
+            background: rgba(3,7,18,.78); color: #F8FAFC; border: 1px solid rgba(255,255,255,.12);
+            font-size: clamp(14px, 1.4vw, 18px); line-height: 1.55; padding: 8px 16px; border-radius: 10px;
+            text-align: center; display: none; pointer-events: none; overflow: hidden;
+            white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+            backdrop-filter: blur(12px); }
+        #subtitle-bar:empty { display: none; }
+        @media (max-width: 720px), (max-height: 520px) {
+            #local-pip { width: clamp(120px, 26vw, 180px); border-radius: 12px; }
+            #call-controls { bottom: 8px; gap: 8px; }
+            #call-controls button { width: 44px; height: 44px; }
+            #call-controls button img { width: 21px; height: 21px; }
+            #camera-profile-bar { bottom: 62px; max-width: calc(100% - 20px); overflow: hidden; }
+            #camera-profile-bar button { min-width: 0; padding: 0 9px; }
+            #subtitle-bar { bottom: 106px; max-width: calc(100% - 24px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+        }
     </style>
 </head>
 <body>

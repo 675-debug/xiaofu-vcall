@@ -35,6 +35,11 @@ private slots:
     void on_btnSettings_clicked();
     void on_btnChooseRecordDir_clicked();
     void on_btnAddContact_clicked();
+    void on_btnAddContactCancel_clicked();
+    void on_btnAddContactConfirm_clicked();
+    void on_editAddContact_textChanged(const QString& text);
+    void on_btnFriendReject_clicked();
+    void on_btnFriendAccept_clicked();
     void on_btnLogout_clicked();
     void on_btnCloseModal_clicked();
     void on_btnClearChatRecords_clicked();
@@ -69,8 +74,7 @@ private:
     void setContactOnlineState(const QString& username, bool online, bool addNotice);
     QString avatarColor(int avatarSeed) const;
     void updateChatAvatar(const QString& nickname, int avatarSeed, bool online);
-    void showFriendRequestDialog(const QString& sender, const QString& nickname, int avatarSeed);
-    QString showAddContactDialog();
+    void showFriendRequestPanel(const QString& sender, const QString& nickname, int avatarSeed);
     QString recordSaveDirectory() const;
 
     Ui::MainWidget* ui;
@@ -80,4 +84,5 @@ private:
     struct ContactInfo { QString nickname; int avatarSeed = 0; bool online = false; };
     QHash<QString, ContactInfo> contactsByUsername;
     QSet<QString> ignoredHistoryPeers;
+    QString pendingFriendRequestSender;
 };

@@ -82,10 +82,6 @@
         X.log.ice('ICE_POLICY=' + X.state.iceTransportPolicy);
     }
 
-    function setDiagFilter() {
-        X.log.ice('CANDIDATE_FILTER=none');
-    }
-
     function parseCandidate(candidateLine) {
         var raw = X.text(candidateLine);
         var body = raw.indexOf('candidate:') === 0 ? raw.substring(10) : raw;
@@ -207,7 +203,6 @@
         safeIceServers: safeIceServers,
         setIceServers: setIceServers,
         setIcePolicy: setIcePolicy,
-        setDiagFilter: setDiagFilter,
         parseCandidate: parseCandidate,
         candidateText: candidateText,
         sdpUfrag: sdpUfrag,

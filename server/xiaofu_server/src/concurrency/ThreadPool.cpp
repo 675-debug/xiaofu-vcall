@@ -81,11 +81,14 @@ void ThreadPool::workerLoop(std::size_t workerIndex) {
             continue;
         }
 
-        // 执行任务前确保连接可用，断线会自动重连。
-        if (!database.ping()) {
-            Log::error("mysql unavailable, DB task skipped");
-            continue;
+        // 任务已经出队后不能静默丢弃。数据库短暂不可用时保留当前任务，
+        // 等连接恢复后再执行；服务停止时才放弃尚未执行的任务。
+        while (!stopping.load() && !database.ping()) {
+            Log::error("mysql unavailable, retrying current DB task in 1s");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
+        if (stopping.load())
+            return;
 
         try {
             task(database);

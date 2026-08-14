@@ -38,7 +38,7 @@ HEADERS += \
     src/RecordingPaths.h \
     src/video/WebRtcBridge.h \
     src/video/VideoCallController.h \
-    src/network/NetworkManager.h
+    src/network/NetworkManager.h \
     src/network/ProtocolCodes.h
 
 FORMS += \
@@ -60,3 +60,8 @@ CONFIG -= qtquickcompiler
 
 # Windows exe 图标
 RC_ICONS += app.ico
+
+# 运行配置与 exe 同目录分发；环境变量 XIAOFU_ASR_URL 仍可优先覆盖。
+asr_config.files = $$PWD/asr.url
+asr_config.path = $$DESTDIR
+COPIES += asr_config

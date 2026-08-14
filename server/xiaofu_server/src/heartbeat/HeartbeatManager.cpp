@@ -11,6 +11,9 @@ HeartbeatManager::HeartbeatManager(EventLoop* eventLoop, JoinHandler* handler,
 
 void HeartbeatManager::check() {
     const int kickedCount = joinHandler->kickTimeoutUsers(timeoutMs);
-    Log::info("heartbeat check: online=" + std::to_string(joinHandler->onlineCount())
-              + ", kicked=" + std::to_string(kickedCount));
+    if (kickedCount > 0) {
+        Log::info("heartbeat timeout cleanup: online="
+                  + std::to_string(joinHandler->onlineCount())
+                  + ", kicked=" + std::to_string(kickedCount));
+    }
 }

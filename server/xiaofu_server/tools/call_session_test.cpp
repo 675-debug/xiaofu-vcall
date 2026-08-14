@@ -73,6 +73,10 @@ int main() {
     // ---------- 边界 ----------
     check(mgr.create("bad", "same", 1, "same", 2, now) == nullptr, "create rejects caller==callee");
     check(mgr.create("", "a", 1, "b", 2, now) == nullptr, "create rejects empty callId");
+    check(mgr.create("call_5", "dave", 14, "erin", 15, now + 110) == nullptr,
+          "create rejects duplicate callId");
+    check(mgr.findByCallId("call_5")->caller == "alice",
+          "duplicate callId does not overwrite existing session");
 
     std::printf(failures == 0 ? "ALL PASS\n" : "FAILURES: %d\n", failures);
     return failures == 0 ? 0 : 1;

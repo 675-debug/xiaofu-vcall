@@ -36,6 +36,7 @@ stderr*.txt
 # IDE / editor settings
 .idea/
 .vscode/
+.superpowers/
 client/.qtc_clangd/
 *.user
 
@@ -71,7 +72,7 @@ server/FunASR_Server/model/*
 server/FunASR_Server/logs/*
 !server/FunASR_Server/logs/.gitkeep
 server/FunASR_Server/venv/
-# SQLite 运行数据库（xiaofu_server 运行时生成，不入库）
+# xiaofu_server 本地运行数据目录（当前数据库实现为 MySQL）
 server/xiaofu_server/data/
 
 # Python 字节码缓存
