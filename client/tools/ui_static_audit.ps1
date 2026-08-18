@@ -63,11 +63,19 @@ if ($mainWindowText.Contains('physical.width() / dpr')) {
     $failures.Add('MainWindow.cpp: still converts fixed physical size through DPR')
 }
 
-$asrConfig = Join-Path $clientRoot 'asr.url'
-if (-not (Test-Path -LiteralPath $asrConfig)) {
-    $failures.Add('missing client/asr.url')
-} elseif ((Get-Content -Raw -LiteralPath $asrConfig).Trim() -ne 'ws://101.33.235.237:10095') {
-    $failures.Add('client/asr.url: unexpected endpoint')
+$runtimeConfig = Join-Path $clientRoot 'config.ini.example'
+if (-not (Test-Path -LiteralPath $runtimeConfig)) {
+    $failures.Add('missing client/config.ini.example')
+} else {
+    $runtimeConfigText = Get-Content -Raw -LiteralPath $runtimeConfig
+    foreach ($section in @('[network]', '[webrtc]', '[subtitle]', '[performance]')) {
+        if (-not $runtimeConfigText.Contains($section)) {
+            $failures.Add("client/config.ini.example: missing section '$section'")
+        }
+    }
+    if (-not $runtimeConfigText.Contains('turn_credential=')) {
+        $failures.Add('client/config.ini.example: missing empty TURN credential setting')
+    }
 }
 
 if ($failures.Count -gt 0) {

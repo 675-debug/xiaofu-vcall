@@ -24,6 +24,7 @@ endif()
 
 add_executable(xiaofu-vcall-client WIN32
     src/main.cpp
+    src/ClientConfig.cpp
     src/MainWindow.cpp
     src/MainWidget.cpp
     src/LoginWidget.cpp
@@ -35,6 +36,7 @@ add_executable(xiaofu-vcall-client WIN32
     src/video/VideoCallController.cpp
     src/network/NetworkManager.cpp
     src/MainWindow.h
+    src/ClientConfig.h
     src/MainWidget.h
     src/LoginWidget.h
     src/RegisterWidget.h
@@ -57,6 +59,13 @@ add_executable(xiaofu-vcall-client WIN32
 )
 
 target_include_directories(xiaofu-vcall-client PRIVATE src)
+
+add_custom_command(TARGET xiaofu-vcall-client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/config.ini.example
+            $<TARGET_FILE_DIR:xiaofu-vcall-client>/config.ini.example
+    COMMENT "Copying runtime configuration example"
+)
 
 target_link_libraries(xiaofu-vcall-client PRIVATE
     Qt${QT_VERSION_MAJOR}::Core

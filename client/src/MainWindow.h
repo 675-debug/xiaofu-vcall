@@ -1,4 +1,5 @@
 #pragma once
+#include "ClientConfig.h"
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -13,7 +14,7 @@ class MainWindow;
 class MainWindow : public QWidget {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(const ClientConfig& config, QWidget* parent = nullptr);
     ~MainWindow();
 
 protected:
@@ -34,7 +35,6 @@ private:
     void updateResizeCursor(const QPoint& globalPos);
     void startWindowResize(const QPoint& globalPos);
     void applyPageMinimumSize();
-    void clearMinSizeRecursive(QWidget* w);
 
     QSize boundedWindowSize(const QSize& preferred) const;
     static const QSize kAuthWindowSize;
@@ -44,6 +44,7 @@ private:
     static const int kResizeGrip = 6; // 边缘缩放热区宽度（逻辑像素）
 
     Ui::MainWindow* ui;
+    ClientConfig clientConfig;
     NetworkManager* networkManager = nullptr;
     QPoint dragOffset;
     bool dragging = false;

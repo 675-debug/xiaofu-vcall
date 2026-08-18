@@ -28,26 +28,28 @@ QToolButton#btnMin:hover,QToolButton#btnMax:hover{background:#F5F5F5;}
 QToolButton#btnClose:hover{background:#FF5F57;}
 QPushButton#btnBack{border:none;background:transparent;color:#007AFF;font-size:13px;font-weight:500;padding:4px 2px;}
 QPushButton#btnBack:hover{color:#0062CC;}
-#convListPanel{background:#FAFAFA;border-right:1px solid #E8E8ED;}
+#convListPanel{background:#F8FAFC;border-right:1px solid #E4E9F0;}
 #labelConvTitle{font-size:15px;font-weight:700;color:#1A1A2E;padding:14px 16px 6px 16px;}
 QListWidget#convList{border:none;background:transparent;outline:none;}
 QListWidget#convList::item{padding:12px 16px;border-left:2px solid transparent;color:#1A1A2E;font-size:13px;}
-QListWidget#convList::item:hover{background:#F5F5F5;}
-QListWidget#convList::item:selected{background:#EBF5FF;border-left-color:#007AFF;color:#1A1A2E;}
+QListWidget#convList::item:hover{background:#EEF3F8;}
+QListWidget#convList::item:selected{background:#E7F1FF;border-left-color:#007AFF;color:#1A1A2E;}
 #chatPanel{background:#FFFFFF;}
 #chatHead{border-bottom:1px solid #F0F0F3;background:#FFFFFF;}
-#headAvatar{border-radius:16px;background:#10B981;color:#FFFFFF;font-size:12px;font-weight:700;}
+#headAvatar{border-radius:22px;background:#10B981;color:#FFFFFF;font-size:14px;font-weight:700;}
 #headName{font-size:14px;font-weight:600;color:#1A1A2E;}
 #headStatus{font-size:11px;color:#34C759;font-weight:500;}
-QToolButton#btnCall{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;}
-QToolButton#btnCall:hover{background:#E8E8ED;}
+QToolButton#btnCall{border:1px solid #DDE3EB;border-radius:10px;background:#FFFFFF;color:#48484A;font-size:13px;font-weight:500;padding:0 14px;}
+QToolButton#btnCall:hover{background:#F0F4F8;border-color:#CBD5E1;}
+QToolButton#btnCall:pressed{background:#E7EDF4;}
+QToolButton#btnCall:disabled{background:#F4F5F7;color:#B0B5BD;border-color:#ECEFF3;}
 QListWidget#listMessages{border:none;background:#FAFAFA;}
 QListWidget#listMessages::item{padding:0px;color:#1A1A2E;font-size:13px;}
-#inputRow{background:#FFFFFF;border-top:1px solid #E8E8ED;}
-QLineEdit#editMessage{border:1.5px solid #E8E8ED;border-radius:10px;padding:0 14px;font-size:13px;background:#FAFAFA;color:#1A1A2E;}
+#inputRow{background:#F8FAFC;border-top:1px solid #E4E9F0;}
+QLineEdit#editMessage{border:1px solid #D8DEE7;border-radius:12px;padding:0 16px;font-size:13px;background:#FFFFFF;color:#1A1A2E;}
 QLineEdit#editMessage:focus{border-color:#007AFF;background:#FFFFFF;}
-QPushButton#btnSend{background:#007AFF;color:#FFFFFF;border:none;border-radius:10px;font-size:13px;font-weight:600;padding:0 22px;}
-QPushButton#btnSend:hover{background:#0062CC;}
+QPushButton#btnSend{background:#007AFF;color:#FFFFFF;border:none;border-radius:12px;font-size:13px;font-weight:600;padding:0 22px;}
+QPushButton#btnSend:hover{background:#006FE6;}
 QPushButton#btnSend:pressed{background:#0051A8;}
 QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
   </property>
@@ -305,13 +307,13 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>60</height>
+             <height>72</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>16777215</width>
-             <height>60</height>
+             <height>72</height>
             </size>
            </property>
            <layout class="QHBoxLayout" name="chatHeadLayout">
@@ -334,14 +336,14 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
              <widget class="QLabel" name="headAvatar">
               <property name="minimumSize">
                <size>
-                <width>32</width>
-                <height>32</height>
+                <width>44</width>
+                <height>44</height>
                </size>
               </property>
               <property name="maximumSize">
                <size>
-                <width>32</width>
-                <height>32</height>
+                <width>44</width>
+                <height>44</height>
                </size>
               </property>
               <property name="text">
@@ -390,17 +392,20 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
              <widget class="QToolButton" name="btnCall">
               <property name="minimumSize">
                <size>
-                <width>42</width>
-                <height>36</height>
+                <width>88</width>
+                <height>38</height>
                </size>
               </property>
               <property name="maximumSize">
                <size>
-                <width>42</width>
-                <height>36</height>
+                <width>88</width>
+                <height>38</height>
                </size>
               </property>
               <property name="toolTip">
+               <string>视频通话</string>
+              </property>
+              <property name="text">
                <string>视频通话</string>
               </property>
               <property name="icon">
@@ -412,6 +417,9 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
                 <width>18</width>
                 <height>18</height>
                </size>
+              </property>
+              <property name="toolButtonStyle">
+               <enum>Qt::ToolButtonTextBesideIcon</enum>
               </property>
              </widget>
             </item>
@@ -430,13 +438,13 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>64</height>
+             <height>72</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>16777215</width>
-             <height>64</height>
+             <height>72</height>
             </size>
            </property>
            <layout class="QHBoxLayout" name="inputRowLayout">
@@ -460,13 +468,13 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>40</height>
+                <height>44</height>
                </size>
               </property>
               <property name="maximumSize">
                <size>
                 <width>16777215</width>
-                <height>40</height>
+                <height>44</height>
                </size>
               </property>
               <property name="placeholderText">
@@ -478,14 +486,14 @@ QPushButton#btnSend:disabled{background:#A8CFFF;color:#F7FAFF;}</string>
              <widget class="QPushButton" name="btnSend">
               <property name="minimumSize">
                <size>
-                <width>84</width>
-                <height>40</height>
+                <width>88</width>
+                <height>44</height>
                </size>
               </property>
               <property name="maximumSize">
                <size>
-                <width>84</width>
-                <height>40</height>
+                <width>88</width>
+                <height>44</height>
                </size>
               </property>
               <property name="cursor">

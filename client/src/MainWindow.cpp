@@ -6,6 +6,7 @@
 #include "MainWidget.h"
 #include "ChatWidget.h"
 #include "CallWidget.h"
+#include "ClientConfig.h"
 #include "network/NetworkManager.h"
 #include <QPainter>
 #include <QMouseEvent>
@@ -31,8 +32,8 @@ QSize MainWindow::boundedWindowSize(const QSize& preferred) const {
     return preferred.scaled(available, Qt::KeepAspectRatio);
 }
 
-MainWindow::MainWindow(QWidget* parent)
-    : QWidget(parent), ui(new Ui::MainWindow) {
+MainWindow::MainWindow(const ClientConfig& config, QWidget* parent)
+    : QWidget(parent), ui(new Ui::MainWindow), clientConfig(config) {
     ui->setupUi(this);
 
     networkManager = new NetworkManager(this);
@@ -42,6 +43,7 @@ MainWindow::MainWindow(QWidget* parent)
     ui->forgotPage->setNetworkManager(networkManager);
     ui->chatPage->setNetworkManager(networkManager);
     ui->callPage->setNetworkManager(networkManager);
+    ui->callPage->setClientConfig(clientConfig);
 
     setupConnections();
     initNetwork();
@@ -60,14 +62,8 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::initNetwork() {
-    // 正式客户端默认连接云服务器；开发测试可通过环境变量覆盖，无需修改源码。
-    const QString serverHost = qEnvironmentVariable("XIAOFU_SERVER_HOST", "8.137.152.134");
-    bool portValid = false;
-    const int configuredPort = qEnvironmentVariableIntValue("XIAOFU_SERVER_PORT", &portValid);
-    const quint16 serverPort = portValid && configuredPort > 0 && configuredPort <= 65535
-        ? static_cast<quint16>(configuredPort) : static_cast<quint16>(9000);
-    qDebug() << "[MainWindow] connect server:" << serverHost << serverPort;
-    networkManager->connectToServer(serverHost, serverPort);
+    qDebug() << "[MainWindow] connect server:" << clientConfig.serverHost() << clientConfig.serverPort();
+    networkManager->connectToServer(clientConfig.serverHost(), clientConfig.serverPort());
 }
 
 void MainWindow::showAuthPage(int index) {
@@ -241,31 +237,17 @@ void MainWindow::applyPageMinimumSize() {
         ui->chatPage->setMinimumSize(0, 0);
         ui->callPage->setMinimumSize(0, 0);
     } else {
-        // 主面板/通话页：允许缩到默认尺寸的约 10%（186x106 物理像素）。
+        // 工作区保留可用的最小尺寸；控件尺寸由各页面的 Designer 布局负责。
         setMinimumSize(kMinWorkspaceWindowSize);
-        // QStackedWidget 的最小尺寸是所有子页面的最大值，只有把全部页面
-        // 的最小尺寸约束解除，顶层窗口才能真正缩到 186x106。
+        // 只解除未显示页面的页级约束，不能递归清空子控件 minimumSize，
+        // 否则聊天头部、头像和输入区会被布局压缩到接近 0。
         ui->mainPage->setMinimumSize(0, 0);
         ui->chatPage->setMinimumSize(0, 0);
         ui->callPage->setMinimumSize(0, 0);
         ui->loginPage->setMinimumSize(0, 0);
         ui->registerPage->setMinimumSize(0, 0);
         ui->forgotPage->setMinimumSize(0, 0);
-        // 子页面内部控件仍带 .ui 硬编码的 minimumSize（侧栏、按钮等），
-        // 会通过布局把窗口最小尺寸顶回去；递归解除，使窗口可自由缩小。
-        clearMinSizeRecursive(ui->mainPage);
-        clearMinSizeRecursive(ui->chatPage);
-        clearMinSizeRecursive(ui->callPage);
     }
-}
-
-void MainWindow::clearMinSizeRecursive(QWidget* w) {
-    if (!w)
-        return;
-    w->setMinimumSize(0, 0);
-    const QList<QWidget*> children = w->findChildren<QWidget*>();
-    for (QWidget* c : children)
-        c->setMinimumSize(0, 0);
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {

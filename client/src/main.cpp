@@ -9,11 +9,13 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <cstdio>
+#include "ClientConfig.h"
 #include "MainWindow.h"
 
 // ============================================================
@@ -141,11 +143,17 @@ int main(int argc, char* argv[]) {
     //   XIAOFU_DISABLE_VIDEO_DECODE=1 -> --disable-accelerated-video-decode
     //   XIAOFU_DISABLE_GPU=1          -> --disable-gpu
     // 两个开关互斥使用：先试 VIDEO_DECODE，无效再试 GPU。
+    // QApplication 尚未构造；Windows 使用 GetModuleFileNameW 严格定位 exe。
+    const QString configPath = ClientConfig::executableConfigPath(QString::fromLocal8Bit(argv[0]));
+    const QString configExamplePath = QFileInfo(configPath).absoluteDir()
+                                          .filePath(QStringLiteral("config.ini.example"));
+    ClientConfig::ensureRuntimeConfig(configPath, configExamplePath);
+    const ClientConfig config(configPath);
     QStringList chromiumFlags;
-    if (qEnvironmentVariableIntValue("XIAOFU_DISABLE_VIDEO_DECODE") == 1) {
+    if (config.disableVideoDecode()) {
         chromiumFlags << QStringLiteral("--disable-accelerated-video-decode");
     }
-    if (qEnvironmentVariableIntValue("XIAOFU_DISABLE_GPU") == 1) {
+    if (config.disableGpu()) {
         chromiumFlags << QStringLiteral("--disable-gpu");
     }
     if (!chromiumFlags.isEmpty()) {
@@ -164,6 +172,9 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("xiaofu-vcall-client"));
     // 文件日志：XIAOFU_LOG_DIR 环境变量 > exe 同目录 logs/ > %APPDATA%/xiaofu-vcall-client/logs/
     installFileLogger();
+    if (!config.initializationWarning().isEmpty())
+        qWarning().noquote() << "[Config]" << config.initializationWarning();
+    qInfo().noquote() << "[Config] source=" << QFileInfo(config.sourcePath()).fileName();
     qInfo().noquote() << "[WebEnv] Qt version=" << qVersion();
     qInfo().noquote() << "[WebEnv] OS=" << QSysInfo::prettyProductName()
                       << "kernel=" << QSysInfo::kernelType() << QSysInfo::kernelVersion();
@@ -181,7 +192,7 @@ int main(int argc, char* argv[]) {
         "QMessageBox QPushButton { background-color: #007AFF; color: #FFFFFF;"
         " border: none; border-radius: 6px; min-width: 72px; padding: 6px 14px; }"
         "QMessageBox QPushButton:hover { background-color: #0062CC; }");
-    MainWindow w;
+    MainWindow w(config);
     w.show();
     return app.exec();
 }

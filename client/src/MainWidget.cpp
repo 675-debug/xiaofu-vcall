@@ -147,12 +147,12 @@ void MainWidget::addContactItem(QListWidget* list, const QString& name,
                                 const QString& status, const QString& color) {
     auto* item = new QListWidgetItem(list);
     item->setData(Qt::UserRole, name);   // 名字存入 data，避免 item 文本与 item widget 重复显示
-    item->setSizeHint(QSize(0, 60));
+    item->setSizeHint(QSize(0, 64));
 
     auto* row = new QWidget(list);
     auto* layout = new QHBoxLayout(row);
-    // 列表项高 60px：上方 6px、下方 14px，让 40px 头像略微上移且不再被底部裁切。
-    layout->setContentsMargins(16, 6, 16, 14);
+    // 联系人是运行时数据，条目只能动态创建；尺寸与 Designer 中的侧栏节奏保持一致。
+    layout->setContentsMargins(16, 12, 16, 12);
     layout->setSpacing(12);
 
     auto* avatar = new QLabel(row);
@@ -421,14 +421,14 @@ QString MainWidget::avatarColor(int avatarSeed) const {
 
 void MainWidget::updateChatAvatar(const QString& nickname, int avatarSeed, bool online) {
     ui->chatAvatar->setText(nickname.left(1).toUpper());
-    ui->chatAvatar->setStyleSheet(QString("background:%1;color:#FFFFFF;border-radius:18px;font-size:14px;font-weight:700;").arg(avatarColor(avatarSeed)));
+    ui->chatAvatar->setStyleSheet(QString("background:%1;color:#FFFFFF;border-radius:22px;font-size:14px;font-weight:700;").arg(avatarColor(avatarSeed)));
     QLabel* dot = ui->chatAvatar->findChild<QLabel*>("offlineDot");
     if (!online) {
         if (!dot) {
             dot = new QLabel(ui->chatAvatar);
             dot->setObjectName("offlineDot");
             dot->setFixedSize(10, 10);
-            dot->move(27, 27);
+            dot->move(31, 31);
             dot->setStyleSheet("background:#FF453A;border:2px solid #FFFFFF;border-radius:5px;");
         }
         dot->show();

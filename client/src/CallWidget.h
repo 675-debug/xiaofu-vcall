@@ -1,5 +1,7 @@
 #pragma once
+#include "ClientConfig.h"
 #include <QWidget>
+#include <optional>
 
 class NetworkManager;
 class QEvent;
@@ -20,6 +22,7 @@ public:
     ~CallWidget();
 
     void setNetworkManager(NetworkManager* manager);
+    void setClientConfig(const ClientConfig& config);
     void startOutgoingCall(const QString& peerName);
     // 本地预览自测：不发起通话，直接进入通话页并打开摄像头（XIAOFU_PREVIEW_TEST=1）。
     void showLocalPreviewTest();
@@ -48,9 +51,11 @@ private:
     void showIncomingCallDialog(const QString& peerName);
     void updateCallPageForState();
     void showCallErrorAndBack(const QString& message);
+    void applyClientConfig();
 
     Ui::CallWidget* ui;
     NetworkManager* networkManager = nullptr;
+    std::optional<ClientConfig> clientConfig;
     QWebEngineView* webRtcView = nullptr;
     QWebChannel* webChannel = nullptr;
     WebRtcBridge* webRtcBridge = nullptr;

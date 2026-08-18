@@ -104,10 +104,11 @@ void WebRtcBridge::applyIcePolicy() {
 
 void WebRtcBridge::setSubtitleUrl(const QString& url) {
     pendingSubtitleUrl = url;
-    qDebug().noquote() << "[Call] subtitle asr url:" << url;
+    qDebug().noquote() << "[Call] subtitle ASR configured=" << !url.isEmpty();
     if (!page)
         return;
-    const QString urlJson = QStringLiteral("\"%1\"").arg(url);
+    const QByteArray arrayJson = QJsonDocument(QJsonArray{url}).toJson(QJsonDocument::Compact);
+    const QString urlJson = QString::fromUtf8(arrayJson.mid(1, arrayJson.size() - 2));
     runPageScript(QStringLiteral("window.xiaofuWebRtc && window.xiaofuWebRtc.setSubtitleUrl(%1);")
                       .arg(urlJson));
 }
@@ -148,7 +149,8 @@ void WebRtcBridge::runPageScript(const QString& script) {
     if (!page)
         return;
     const QString lower = script.toLower();
-    if (lower.contains(QStringLiteral("credential"))
+    if (lower.contains(QStringLiteral("setsubtitleurl"))
+        || lower.contains(QStringLiteral("credential"))
         || lower.contains(QStringLiteral("password"))
         || lower.contains(QStringLiteral("token"))
         || lower.contains(QStringLiteral("secret"))) {

@@ -1,0 +1,17 @@
+[network]
+server_host=8.137.152.134
+server_port=9000
+
+[webrtc]
+stun_url=stun:8.137.152.134:3478
+turn_url=turn:8.137.152.134:3478
+turn_username=
+turn_credential=
+ice_policy=all
+
+[subtitle]
+asr_url=ws://101.33.235.237:10095
+
+[performance]
+disable_gpu=false
+disable_video_decode=false

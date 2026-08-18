@@ -1,6 +1,8 @@
 ﻿cmake_minimum_required(VERSION 3.16)
 project(xiaofu-server CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -32,6 +34,7 @@ set(BUSINESS_SOURCES
 if(UNIX AND NOT APPLE)
     set(SERVER_SOURCES
         src/main.cpp
+        src/ServerOptions.cpp
         src/ServerApp.cpp
         src/net/SocketPlatform.cpp
         src/net/EpollLoop.cpp
@@ -57,6 +60,12 @@ add_executable(unit_test
     src/db/PasswordHasher.cpp)
 target_include_directories(unit_test PRIVATE src)
 target_link_libraries(unit_test PRIVATE ${PASSWORD_HASH_LIBRARY})
+
+add_executable(server_options_test
+    tools/server_options_test.cpp
+    src/ServerOptions.cpp)
+target_include_directories(server_options_test PRIVATE src)
+add_test(NAME server_options_test COMMAND server_options_test)
 
 add_executable(chat_handler_test
     tools/chat_handler_test.cpp

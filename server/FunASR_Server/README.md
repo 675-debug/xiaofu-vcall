@@ -32,6 +32,19 @@ python src/asr_server.py --host 0.0.0.0 --port 10095 --model-dir /absolute/model
 
 公网部署应使用防火墙限制来源；需要 TLS 时，可在反向代理层提供 `wss://`。
 
+## Ubuntu systemd 部署
+
+环境变量示例位于 `deploy/funasr-server.env.example`，部署时复制到 `/etc/xiaofu-asr.env` 并按实际模型路径调整。service unit 位于 `deploy/xiaofu-asr.service`。
+
+```bash
+sudo install -o root -g root -m 600 deploy/funasr-server.env.example /etc/xiaofu-asr.env
+sudo install -o root -g root -m 644 deploy/xiaofu-asr.service /etc/systemd/system/xiaofu-asr.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now xiaofu-asr.service
+sudo systemctl status xiaofu-asr.service
+sudo journalctl -u xiaofu-asr.service -f
+```
+
 ## 最小 WebSocket 检查
 
 下面只检查握手与空会话 final，不验证识别质量：

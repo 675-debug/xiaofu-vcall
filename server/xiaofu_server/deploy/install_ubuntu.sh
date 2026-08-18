@@ -22,6 +22,11 @@ install -d -o xiaofu -g xiaofu /opt/xiaofu-vcall/bin /var/lib/xiaofu-vcall
 install -m 0755 "${build_dir}/xiaofu-server" /opt/xiaofu-vcall/bin/xiaofu-server
 install -m 0644 "${project_root}/xiaofu_server/deploy/xiaofu-server.service" \
     /etc/systemd/system/xiaofu-server.service
+if [[ ! -e /etc/xiaofu-server.env ]]; then
+    install -o root -g root -m 0600 \
+        "${project_root}/xiaofu_server/deploy/xiaofu-server.env.example" \
+        /etc/xiaofu-server.env
+fi
 
 systemctl daemon-reload
 systemctl enable --now xiaofu-server

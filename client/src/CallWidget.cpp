@@ -1,5 +1,7 @@
 #include "CallWidget.h"
 
+#include "ClientConfig.h"
+
 #include "ui_CallWidget.h"
 
 #include "network/NetworkManager.h"
@@ -40,11 +42,7 @@
 
 #include "RecordingPaths.h"
 
-#include <QCoreApplication>
-
 #include <QDateTime>
-
-#include <QFile>
 
 #include <QFileInfo>
 
@@ -94,15 +92,13 @@ const int kPipDefaultTopMargin = 16;
 
 // 构建 WebRTC ICE 服务器列表：默认 STUN+TURN 同时注入（标准 ICE：P2P/STUN 优先，TURN 兜底），
 
-// 环境变量可覆盖。真实 TURN 凭据只允许通过环境变量注入，禁止把历史默认凭据提交到代码仓库。
+// ClientConfig 统一处理环境变量、INI 和默认值的优先级及 URL 校验。
 
-QVariantList buildIceServers() {
+QVariantList buildIceServers(const ClientConfig& config) {
 
     QVariantList servers;
 
-    const QString stunUrl = qEnvironmentVariable("XIAOFU_STUN_URL",
-
-                                                 QStringLiteral("stun:8.137.152.134:3478"));
+    const QString stunUrl = config.stunUrl();
 
     if (!stunUrl.isEmpty()) {
 
@@ -110,15 +106,13 @@ QVariantList buildIceServers() {
 
     }
 
-    const QString turnUrl = qEnvironmentVariable("XIAOFU_TURN_URL",
-
-                                                 QStringLiteral("turn:8.137.152.134:3478"));
+    const QString turnUrl = config.turnUrl();
 
     if (!turnUrl.isEmpty()) {
 
-        const QString username = qEnvironmentVariable("XIAOFU_TURN_USERNAME").trimmed();
+        const QString username = config.turnUsername();
 
-        const QString credential = qEnvironmentVariable("XIAOFU_TURN_CREDENTIAL").trimmed();
+        const QString credential = config.turnCredential();
 
         // turn:/turns: 协议必须同时提供 username/credential，否则 TURN allocation 会失败。
 
@@ -153,82 +147,6 @@ QVariantList buildIceServers() {
     }
 
     return servers;
-
-}
-
-
-
-// 读取 ICE 传输策略环境变量：XIAOFU_ICE_POLICY=relay 时强制所有媒体走 TURN 中继，
-
-// 用于隔离“直连路径(NAT/内网)坏、TURN 中继好”的场景；其他值返回 "all"(标准 ICE：P2P/STUN 优先，TURN 兜底)。
-
-QString iceTransportPolicyFromEnv() {
-
-    const QString policy = qEnvironmentVariable("XIAOFU_ICE_POLICY").trimmed().toLower();
-
-    if (policy == QLatin1String("relay"))
-
-        return QStringLiteral("relay");
-
-    return QStringLiteral("all");
-
-}
-
-
-
-// 实时字幕 FunASR WebSocket 地址（统一运行配置，部署地址只在这里维护一份）：
-
-//   1) 环境变量 XIAOFU_ASR_URL（开发/诊断 override，例如 ws://127.0.0.1:10095）
-
-//   2) exe 同目录 asr.url 配置文件（内容为完整 ws:// 地址，正常打包分发时写入）
-
-//   3) 两者都未提供时返回空地址：不连接 WebSocket，UI 提示“字幕服务未配置”。
-
-// 地址由 C++ 注入 subtitle.js，subtitle.js 不再维护任何兜底地址。
-
-struct AsrUrlConfig {
-
-    QString url;
-
-    QString source;  // env / config / none
-
-};
-
-
-
-AsrUrlConfig resolveAsrUrl() {
-
-    // 1) 环境变量优先（开发/诊断 override）
-
-    const QByteArray envUrl = qgetenv("XIAOFU_ASR_URL");
-
-    if (!envUrl.isEmpty()) {
-
-        const QString url = QString::fromUtf8(envUrl).trimmed();
-
-        if (!url.isEmpty())
-
-            return {url, QStringLiteral("env")};
-
-    }
-
-    // 2) exe 同目录 asr.url 配置文件（正常打包分发）
-
-    QFile configFile(QCoreApplication::applicationDirPath() + QStringLiteral("/asr.url"));
-
-    if (configFile.exists() && configFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-
-        const QString url = QString::fromUtf8(configFile.readAll()).trimmed();
-
-        if (!url.isEmpty())
-
-            return {url, QStringLiteral("config")};
-
-    }
-
-    // 3) 未配置：返回空地址，不连接
-
-    return {QString(), QStringLiteral("none")};
 
 }
 
@@ -515,6 +433,14 @@ void CallWidget::setNetworkManager(NetworkManager* manager) {
         }
 
     });
+
+}
+
+void CallWidget::setClientConfig(const ClientConfig& config) {
+
+    clientConfig = config;
+
+    applyClientConfig();
 
 }
 
@@ -811,33 +737,7 @@ void CallWidget::setupWebRtcView() {
 
     webRtcBridge->setPage(webRtcView->page());
 
-    webRtcBridge->setIceServers(buildIceServers());
-
-    const QString icePolicy = iceTransportPolicyFromEnv();
-
-    qDebug().noquote() << "[Call] XIAOFU_ICE_POLICY =" << icePolicy;
-
-    webRtcBridge->setIcePolicy(icePolicy);
-
-    const AsrUrlConfig asrUrl = resolveAsrUrl();
-
-    qDebug().noquote() << "[Call] ASR_URL_SOURCE =" << asrUrl.source;
-
-    qDebug().noquote() << "[Call] ASR_URL =" << asrUrl.url;
-
-    if (asrUrl.source == QStringLiteral("env"))
-
-        qDebug().noquote() << "[Call] ASR_ENV_OVERRIDE";
-
-    else if (asrUrl.source == QStringLiteral("config"))
-
-        qDebug().noquote() << "[Call] ASR_CONFIG_FALLBACK";
-
-    else
-
-        qDebug().noquote() << "[Call] ASR_NO_CONFIG";
-
-    webRtcBridge->setSubtitleUrl(asrUrl.url);
+    applyClientConfig();
 
     webChannel->registerObject(QStringLiteral("webRtcBridge"), webRtcBridge);
 
@@ -1076,6 +976,26 @@ void CallWidget::setupWebRtcView() {
     });
 
     webRtcView->setUrl(QUrl(QStringLiteral("qrc:///video/video_call.html")));
+
+}
+
+void CallWidget::applyClientConfig() {
+
+    if (!webRtcBridge || !clientConfig.has_value())
+
+        return;
+
+    webRtcBridge->setIceServers(buildIceServers(*clientConfig));
+
+    qDebug().noquote() << "[Call] ICE_POLICY =" << clientConfig->icePolicy();
+
+    webRtcBridge->setIcePolicy(clientConfig->icePolicy());
+
+    qDebug().noquote() << "[Call] ASR configured =" << !clientConfig->asrUrl().isEmpty()
+
+                       << "source=" << QFileInfo(clientConfig->sourcePath()).fileName();
+
+    webRtcBridge->setSubtitleUrl(clientConfig->asrUrl());
 
 }
 

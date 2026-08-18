@@ -272,7 +272,7 @@
         };
     }
 
-    // 实时字幕：C++ 桥注入 XIAOFU_ASR_URL 或 exe 同目录 asr.url；未配置时保持不可用。
+    // 实时字幕：C++ 桥注入环境变量或 config.ini 中的 ASR URL；未配置时保持不可用。
     function setSubtitleUrl(url) {
         if (X.subtitle && X.subtitle.setUrl) {
             X.subtitle.setUrl(url);

@@ -3,7 +3,7 @@
 
     /* 实时字幕：AudioWorklet 采集远端音频 → 16kHz PCM → WebSocket → FunASR → 黑底白字字幕 */
 
-    // 服务地址由 C++ 桥通过 X.subtitle.setUrl() 注入，只读取 XIAOFU_ASR_URL 或 exe 同目录 asr.url；未配置时保持为空。
+    // 服务地址由 C++ 桥通过 X.subtitle.setUrl() 注入，来自环境变量或 config.ini；未配置时保持为空。
     // 这里不维护任何生产或本机兜底地址；未注入时不会发起 WebSocket 连接。
     var ASR_URL = '';
 

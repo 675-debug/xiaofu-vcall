@@ -1,0 +1,11 @@
+config.ini
+tests/.qmake.stash
+tests/Makefile*
+tests/debug/
+tests/release/
+CONOUT$
+Makefile.*
+xiaofu-vcall-client_resource.rc
+xiaofu-vcall-client_resource.res
+docs/superpowers/
+third_party/QFluentKit/

@@ -38,8 +38,8 @@ QToolButton#btnAvatar{border:none;border-radius:20px;background:#007AFF;color:#F
 QToolButton#btnAvatar:hover{background:#0062CC;}
 #labelMyName{font-size:14px;font-weight:600;color:#1A1A2E;}
 #labelMyStatus{font-size:11px;color:#34C759;font-weight:500;}
-#myAccountInfo{background:#F5F5F5;border-radius:12px;}
-#myAccountInfo:hover{background:#E8E8ED;}
+#myAccountInfo{background:#F4F6F8;border:1px solid #EEF0F3;border-radius:14px;}
+#myAccountInfo:hover{background:#EEF3F8;border-color:#E2E8F0;}
 QLineEdit#editSearch{border:1px solid #D9D9DE;border-radius:10px;padding:0 12px;font-size:13px;background:#F5F5F5;color:#1A1A2E;}
 QLineEdit#editSearch:focus{border-color:#007AFF;background:#FFFFFF;}
 QToolButton#btnSettings,QToolButton#btnAddContact{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;color:#48484A;font-size:13px;font-weight:500;padding:0 10px;}
@@ -47,23 +47,26 @@ QToolButton#btnSettings:hover,QToolButton#btnAddContact:hover{background:#E8E8ED
 #labelOnline,#labelOffline{font-size:11px;font-weight:700;color:#6E6E73;padding:8px 16px 4px 16px;}
 QListWidget#listContacts,QListWidget#listOffline{border:none;background:transparent;outline:none;padding:0 12px 8px 12px;}
 QListWidget#listContacts::item,QListWidget#listOffline::item{padding:0px;border-radius:10px;color:#1A1A2E;font-size:13px;}
-QListWidget#listContacts::item:hover,QListWidget#listOffline::item:hover{background:#F0F0F3;}
-QListWidget#listContacts::item:selected,QListWidget#listOffline::item:selected{background:#E8F1FF;color:#1A1A2E;}
+QListWidget#listContacts::item:hover,QListWidget#listOffline::item:hover{background:#F0F4F8;}
+QListWidget#listContacts::item:selected,QListWidget#listOffline::item:selected{background:#E7F1FF;color:#1A1A2E;border-left:3px solid #007AFF;}
 #detailPanel{background:#FFFFFF;}
 #labelChatEmpty{font-size:14px;color:#AEAEB2;}
-#chatAvatar{border-radius:21px;background:#10B981;color:#FFFFFF;font-size:15px;font-weight:700;}
+#chatAvatar{border-radius:22px;background:#10B981;color:#FFFFFF;font-size:15px;font-weight:700;}
 #chatName{font-size:15px;font-weight:700;color:#1A1A2E;}
 #chatStatus{font-size:11px;color:#34C759;font-weight:500;}
 QToolButton#btnCall{border:1px solid #E8E8ED;border-radius:10px;background:#F5F5F5;color:#48484A;font-size:13px;font-weight:500;padding:0 14px;}
-QToolButton#btnCall:hover{background:#E8E8ED;}
+QToolButton#btnCall:hover{background:#EEF3F8;border-color:#CBD5E1;}
+QToolButton#btnCall:pressed{background:#E2E8F0;}
+QToolButton#btnCall:disabled{background:#F4F5F7;color:#B0B5BD;border-color:#ECEFF3;}
 QListWidget#listMessages{border:none;background:#FFFFFF;}
 QListWidget#listMessages::item{padding:0px;color:#1A1A2E;font-size:13px;}
-#inputRow{background:#FAFAFA;border-top:1px solid #F0F0F3;}
-QLineEdit#editMessage{border:1px solid #D9D9DE;border-radius:10px;padding:0 14px;font-size:13px;background:#FAFAFA;color:#1A1A2E;}
+#inputRow{background:#F8FAFC;border-top:1px solid #E8ECF1;}
+QLineEdit#editMessage{border:1px solid #D8DEE7;border-radius:12px;padding:0 16px;font-size:13px;background:#FFFFFF;color:#1A1A2E;}
 QLineEdit#editMessage:focus{border-color:#007AFF;background:#FFFFFF;}
-QPushButton#btnSend{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1A8CFF,stop:1 #007AFF);color:#FFFFFF;border:none;border-radius:12px;font-size:14px;font-weight:600;padding:0 24px;}
-QPushButton#btnSend:hover{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1284FA,stop:1 #0062CC);}
+QPushButton#btnSend{background:#007AFF;color:#FFFFFF;border:none;border-radius:12px;font-size:14px;font-weight:600;padding:0 24px;}
+QPushButton#btnSend:hover{background:#006FE6;}
 QPushButton#btnSend:pressed{background:#0055B8;}
+QPushButton#btnSend:disabled{background:#B8D8FF;color:#F7FAFF;}
 #settingsMask{background:rgba(0,0,0,60);}
 #settingsPanel{background:#FFFFFF;border-radius:14px;}
 #labelSettingsTitle{font-size:16px;font-weight:700;color:#1A1A2E;}
@@ -698,13 +701,13 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>68</height>
+                 <height>72</height>
                 </size>
                </property>
                <property name="maximumSize">
                 <size>
                  <width>16777215</width>
-                 <height>68</height>
+                 <height>72</height>
                 </size>
                </property>
                <layout class="QHBoxLayout" name="chatHeadLayout">
@@ -727,14 +730,14 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
                  <widget class="QLabel" name="chatAvatar">
                   <property name="minimumSize">
                    <size>
-                    <width>42</width>
-                    <height>42</height>
+                    <width>44</width>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>42</width>
-                    <height>42</height>
+                    <width>44</width>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="text">
@@ -846,13 +849,13 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>64</height>
+                 <height>72</height>
                 </size>
                </property>
                <property name="maximumSize">
                 <size>
                  <width>16777215</width>
-                 <height>64</height>
+                 <height>72</height>
                 </size>
                </property>
                <layout class="QHBoxLayout" name="inputRowLayout">
@@ -876,13 +879,13 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
                   <property name="minimumSize">
                    <size>
                     <width>0</width>
-                    <height>40</height>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
                     <width>16777215</width>
-                    <height>40</height>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="placeholderText">
@@ -894,14 +897,14 @@ QPushButton#btnClearChatRecords:hover{background:#FFE7E5;}</string>
                  <widget class="QPushButton" name="btnSend">
                   <property name="minimumSize">
                    <size>
-                    <width>84</width>
-                    <height>40</height>
+                    <width>88</width>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>84</width>
-                    <height>40</height>
+                    <width>88</width>
+                    <height>44</height>
                    </size>
                   </property>
                   <property name="cursor">

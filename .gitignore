@@ -63,6 +63,11 @@ dist/
 # Linux launcher with real TURN credential (never publish)
 client/start_video_call.sh
 
+# Runtime configuration with deployment-specific values (templates stay tracked)
+client/config.ini
+server/xiaofu_server/deploy/xiaofu-server.env
+server/FunASR_Server/deploy/funasr-server.env
+
 # Local backup files
 *.bak*
 

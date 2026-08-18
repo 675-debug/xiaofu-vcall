@@ -1,0 +1,15 @@
+[Unit]
+Description=Xiaofu FunASR Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/workspace/xiaofu-vcall/server/FunASR_Server
+EnvironmentFile=/etc/xiaofu-asr.env
+ExecStart=/home/ubuntu/workspace/xiaofu-vcall/server/FunASR_Server/venv/bin/python -u src/asr_server.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

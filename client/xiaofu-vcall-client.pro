@@ -16,6 +16,7 @@ INCLUDEPATH += src
 
 SOURCES += \
     src/main.cpp \
+    src/ClientConfig.cpp \
     src/MainWindow.cpp \
     src/MainWidget.cpp \
     src/LoginWidget.cpp \
@@ -28,6 +29,7 @@ SOURCES += \
     src/network/NetworkManager.cpp
 
 HEADERS += \
+    src/ClientConfig.h \
     src/MainWindow.h \
     src/MainWidget.h \
     src/LoginWidget.h \
@@ -61,7 +63,7 @@ CONFIG -= qtquickcompiler
 # Windows exe 图标
 RC_ICONS += app.ico
 
-# 运行配置与 exe 同目录分发；环境变量 XIAOFU_ASR_URL 仍可优先覆盖。
-asr_config.files = $$PWD/asr.url
-asr_config.path = $$DESTDIR
-COPIES += asr_config
+# 运行配置示例随构建产物分发，部署时复制为 config.ini；环境变量仍可优先覆盖。
+runtime_config.files = $$PWD/config.ini.example
+runtime_config.path = $$DESTDIR
+COPIES += runtime_config
